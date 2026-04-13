@@ -1,0 +1,9 @@
+node_modules/
+client/dist/
+mobile/dist/
+shencom.db
+shencom.db-wal
+shencom.db-shm
+.DS_Store
+*.log
+.env

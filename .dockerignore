@@ -1,0 +1,12 @@
+node_modules
+client/node_modules
+client/dist
+mobile/node_modules
+mobile/dist
+shencom.db
+shencom.db-wal
+shencom.db-shm
+.git
+.DS_Store
+*.command
+*.log

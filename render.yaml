@@ -1,0 +1,17 @@
+services:
+  - type: web
+    name: shencom-crm
+    runtime: docker
+    plan: starter
+    region: oregon
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: JWT_SECRET
+        generateValue: true
+      - key: DB_PATH
+        value: /data/shencom.db
+    disk:
+      name: shencom-data
+      mountPath: /data
+      sizeGB: 1

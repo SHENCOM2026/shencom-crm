@@ -1,0 +1,36 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply text-gray-800 antialiased;
+    -webkit-tap-highlight-color: transparent;
+    overscroll-behavior: none;
+  }
+  html { height: -webkit-fill-available; }
+  body { min-height: -webkit-fill-available; }
+}
+
+@layer components {
+  .btn-primary {
+    @apply bg-claro-red hover:bg-claro-red-dark active:bg-claro-red-dark text-white font-medium py-3 px-4 rounded-xl transition-colors duration-150 min-h-[48px];
+  }
+  .input-field {
+    @apply w-full border border-gray-300 rounded-xl px-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-claro-red focus:border-transparent min-h-[48px];
+  }
+  .select-field {
+    @apply w-full border border-gray-300 rounded-xl px-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-claro-red focus:border-transparent bg-white min-h-[48px];
+  }
+  .card {
+    @apply bg-white rounded-2xl shadow-sm border border-gray-100 p-4;
+  }
+}
+
+/* Safe area for notched phones */
+.pb-safe { padding-bottom: env(safe-area-inset-bottom, 0px); }
+.pt-safe { padding-top: env(safe-area-inset-top, 0px); }
+
+/* Hide scrollbar */
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
