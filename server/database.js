@@ -143,6 +143,17 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_activities_user ON lead_activities(user_id);
   CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(user_id);
   CREATE INDEX IF NOT EXISTS idx_prospect_plans_lead ON lead_prospect_plans(lead_id);
+
+  CREATE TABLE IF NOT EXISTS lead_change_log (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    lead_id INTEGER NOT NULL REFERENCES leads(id) ON DELETE CASCADE,
+    user_id INTEGER NOT NULL REFERENCES users(id),
+    field_name TEXT NOT NULL,
+    old_value TEXT,
+    new_value TEXT,
+    created_at TEXT DEFAULT (datetime('now'))
+  );
+  CREATE INDEX IF NOT EXISTS idx_change_log_lead ON lead_change_log(lead_id);
 `);
 
 // Migration: add new columns if they don't exist

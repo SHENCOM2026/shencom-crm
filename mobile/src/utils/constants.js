@@ -4,7 +4,7 @@ export const PIPELINE_STATUSES = [
   { key: 'interesado', label: 'Interesado', color: 'bg-purple-100 text-purple-800', dotColor: 'bg-purple-500', icon: '💜' },
   { key: 'documentacion', label: 'Documentación', color: 'bg-orange-100 text-orange-800', dotColor: 'bg-orange-500', icon: '📄' },
   { key: 'solicitud_enviada', label: 'Solicitud Enviada', color: 'bg-cyan-100 text-cyan-800', dotColor: 'bg-cyan-500', icon: '📤' },
-  { key: 'portabilidad_exitosa', label: 'Portabilidad Exitosa', color: 'bg-green-100 text-green-800', dotColor: 'bg-green-500', icon: '✅' },
+  { key: 'portabilidad_exitosa', label: 'Venta Exitosa', color: 'bg-green-100 text-green-800', dotColor: 'bg-green-500', icon: '✅' },
   { key: 'rechazado_perdido', label: 'Rechazado/Perdido', color: 'bg-red-100 text-red-800', dotColor: 'bg-red-500', icon: '❌' }
 ];
 

@@ -53,6 +53,14 @@ function buildLeadFilter(req) {
     const s = `%${req.query.search}%`;
     params.push(s, s, s);
   }
+  if (req.query.value_min) {
+    conditions.push('l.prospect_total >= ?');
+    params.push(parseFloat(req.query.value_min));
+  }
+  if (req.query.value_max) {
+    conditions.push('l.prospect_total <= ?');
+    params.push(parseFloat(req.query.value_max));
+  }
 
   return { where: conditions.length ? 'WHERE ' + conditions.join(' AND ') : '', params };
 }
@@ -113,7 +121,16 @@ router.get('/:id', (req, res) => {
     'SELECT * FROM lead_prospect_plans WHERE lead_id = ? ORDER BY id'
   ).all(req.params.id);
 
-  res.json({ ...lead, activities, prospect_plans });
+  // Get change history
+  const change_log = db.prepare(`
+    SELECT cl.*, u.full_name as user_name
+    FROM lead_change_log cl
+    JOIN users u ON cl.user_id = u.id
+    WHERE cl.lead_id = ?
+    ORDER BY cl.created_at DESC LIMIT 50
+  `).all(req.params.id);
+
+  res.json({ ...lead, activities, prospect_plans, change_log });
 });
 
 // Create lead
@@ -238,6 +255,24 @@ router.put('/:id', (req, res) => {
       `Estado cambiado de "${lead.pipeline_status}" a "${pipeline_status}"`
     );
   }
+
+  // Log field changes for audit trail
+  const trackFields = {
+    full_name: 'Nombre', cedula: 'Cédula', phone_primary: 'Teléfono',
+    email: 'Email', pipeline_status: 'Estado', vendor_id: 'Vendedor',
+    supervisor_id: 'Supervisor', notes: 'Notas', lines_to_port: 'Líneas a portar'
+  };
+  const insertChange = db.prepare(
+    'INSERT INTO lead_change_log (lead_id, user_id, field_name, old_value, new_value) VALUES (?, ?, ?, ?, ?)'
+  );
+  Object.entries(trackFields).forEach(([field, label]) => {
+    const newVal = req.body[field];
+    if (newVal !== undefined && String(newVal || '') !== String(lead[field] || '')) {
+      try {
+        insertChange.run(req.params.id, req.user.id, label, String(lead[field] || ''), String(newVal || ''));
+      } catch(e) {}
+    }
+  });
 
   const prospectTotal = prospect_plans !== undefined
     ? (prospect_plans || []).reduce((sum, p) => sum + parseFloat(p.plan_price || 0), 0)

@@ -79,6 +79,53 @@ router.post('/generate', (req, res) => {
     count++;
   });
 
+  // High-value leads without activity for 24+ hours
+  const highValueStale = db.prepare(`
+    SELECT l.id, l.full_name, l.vendor_id, l.prospect_total
+    FROM leads l
+    WHERE l.pipeline_status NOT IN ('portabilidad_exitosa', 'rechazado_perdido')
+      AND l.prospect_total >= 50
+      AND julianday('now') - julianday(l.updated_at) >= 1
+      AND l.id NOT IN (
+        SELECT DISTINCT lead_id FROM notifications
+        WHERE type = 'high_value_stale' AND date(created_at) = date('now')
+      )
+  `).all();
+
+  highValueStale.forEach(lead => {
+    insertNotif.run(lead.vendor_id, 'high_value_stale',
+      `Lead de alto valor "$${lead.prospect_total.toFixed(2)}" - "${lead.full_name}" sin gestión reciente`, lead.id);
+    count++;
+  });
+
+  // Vendor close to monthly goal (80%+)
+  const monthStart = new Date().toISOString().substring(0, 7) + '-01';
+  const vendorsNearGoal = db.prepare(`
+    SELECT u.id, u.full_name, u.monthly_portability_goal as goal,
+      (SELECT COUNT(*) FROM leads l WHERE l.vendor_id = u.id AND l.pipeline_status = 'portabilidad_exitosa'
+       AND date(l.activation_date) >= ?) as sales
+    FROM users u
+    WHERE u.role = 'vendedor' AND u.active = 1
+      AND u.monthly_portability_goal > 0
+      AND u.id NOT IN (
+        SELECT DISTINCT user_id FROM notifications
+        WHERE type = 'near_goal' AND date(created_at) = date('now')
+      )
+  `).all(monthStart);
+
+  vendorsNearGoal.forEach(v => {
+    const pct = (v.sales / v.goal) * 100;
+    if (pct >= 80 && pct < 100) {
+      insertNotif.run(v.id, 'near_goal',
+        `Estás al ${pct.toFixed(0)}% de tu meta mensual (${v.sales}/${v.goal}). ¡Sigue así!`, null);
+      count++;
+    } else if (pct >= 100) {
+      insertNotif.run(v.id, 'near_goal',
+        `¡Felicidades! Superaste tu meta mensual: ${v.sales}/${v.goal} ventas (${pct.toFixed(0)}%)`, null);
+      count++;
+    }
+  });
+
   res.json({ generated: count });
 });
 

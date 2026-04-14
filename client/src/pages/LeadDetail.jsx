@@ -65,6 +65,19 @@ export default function LeadDetail() {
               {lead.next_followup && <div className="flex items-center gap-3 text-sm text-amber-600">⏰ <span>{formatDateTime(lead.next_followup)}</span></div>}
             </div>
 
+            {/* Quick contact buttons */}
+            <div className="mt-4 flex gap-2">
+              <a href={`tel:${lead.phone_primary}`}
+                className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-blue-50 text-blue-700 rounded-lg text-sm font-medium hover:bg-blue-100">
+                📞 Llamar
+              </a>
+              <a href={`https://wa.me/593${lead.phone_primary?.replace(/\D/g, '').slice(-9)}?text=${encodeURIComponent(`Hola ${lead.full_name}, le saluda un asesor de Claro Ecuador.`)}`}
+                target="_blank" rel="noreferrer"
+                className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-green-50 text-green-700 rounded-lg text-sm font-medium hover:bg-green-100">
+                💬 WhatsApp
+              </a>
+            </div>
+
             <div className="mt-4 pt-4 border-t space-y-2 text-sm">
               <div className="flex justify-between"><span className="text-gray-500">Cédula/RUC:</span><span>{lead.cedula || '—'}</span></div>
               <div className="flex justify-between"><span className="text-gray-500">Operador:</span><span>{lead.operator_name || '—'}</span></div>
@@ -172,6 +185,31 @@ export default function LeadDetail() {
                 </div>
               </form>
             </div>
+          )}
+
+          {/* Change History */}
+          {lead.change_log && lead.change_log.length > 0 && (
+            <details className="bg-white rounded-xl shadow-sm border">
+              <summary className="px-5 py-3 text-sm font-semibold text-gray-700 cursor-pointer hover:bg-gray-50">
+                Historial de Cambios ({lead.change_log.length})
+              </summary>
+              <div className="border-t divide-y max-h-60 overflow-y-auto">
+                {lead.change_log.map(ch => (
+                  <div key={ch.id} className="px-5 py-2 text-xs">
+                    <div className="flex items-center justify-between">
+                      <span className="font-medium text-gray-700">{ch.field_name}</span>
+                      <span className="text-gray-400">{formatDateTime(ch.created_at)}</span>
+                    </div>
+                    <div className="flex items-center gap-1 mt-0.5">
+                      <span className="text-red-500 line-through">{ch.old_value || '(vacío)'}</span>
+                      <span className="text-gray-400">→</span>
+                      <span className="text-green-600">{ch.new_value || '(vacío)'}</span>
+                    </div>
+                    <p className="text-gray-400 mt-0.5">Por: {ch.user_name}</p>
+                  </div>
+                ))}
+              </div>
+            </details>
           )}
 
           {/* Timeline */}

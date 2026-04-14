@@ -277,7 +277,7 @@ export default function Leads() {
   const [operators, setOperators] = useState([]);
   const [sources, setSources] = useState([]);
   const [search, setSearch] = useState('');
-  const [filters, setFilters] = useState({ status: '', vendor_id: '', operator_id: '', source_id: '', date_from: '', date_to: '' });
+  const [filters, setFilters] = useState({ status: '', vendor_id: '', operator_id: '', source_id: '', date_from: '', date_to: '', value_min: '', value_max: '' });
 
   const fetchLeads = async () => {
     try {
@@ -405,6 +405,12 @@ export default function Leads() {
             className="text-sm border rounded-lg px-3 py-2" />
           <input type="date" value={filters.date_to} onChange={e => setFilters(f => ({ ...f, date_to: e.target.value }))}
             className="text-sm border rounded-lg px-3 py-2" />
+          <input type="number" placeholder="$ Mín" step="0.01" min="0" value={filters.value_min}
+            onChange={e => setFilters(f => ({ ...f, value_min: e.target.value }))}
+            className="text-sm border rounded-lg px-3 py-2 w-24" />
+          <input type="number" placeholder="$ Máx" step="0.01" min="0" value={filters.value_max}
+            onChange={e => setFilters(f => ({ ...f, value_max: e.target.value }))}
+            className="text-sm border rounded-lg px-3 py-2 w-24" />
         </div>
       </div>
 

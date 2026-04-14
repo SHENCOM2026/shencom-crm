@@ -39,6 +39,86 @@ function USDCard({ title, value, icon, colorClass }) {
   );
 }
 
+function VendorDashboard() {
+  const { user } = useAuth();
+  const [kpis, setKpis] = useState(null);
+  const [pipelineDist, setPipelineDist] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const [k, p] = await Promise.all([
+          api.get('/dashboard/kpis'),
+          api.get('/dashboard/pipeline')
+        ]);
+        setKpis(k);
+        setPipelineDist(p.map(item => {
+          const info = getStatusInfo(item.status);
+          return { name: info.label, value: item.count };
+        }));
+      } catch (e) { console.error(e); }
+      finally { setLoading(false); }
+    };
+    fetchData();
+  }, []);
+
+  if (loading) return <div className="flex items-center justify-center h-64"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-claro-red"></div></div>;
+
+  const salesMonth = kpis?.sales?.month || 0;
+  const goal = kpis?.sales?.goal || 0;
+  const pctMeta = goal > 0 ? ((salesMonth / goal) * 100).toFixed(0) : 0;
+
+  return (
+    <div className="space-y-6">
+      <h1 className="text-2xl font-bold text-gray-900">Mi Dashboard</h1>
+
+      {kpis && (
+        <>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <KPICard title="Leads Hoy" value={kpis.leads.today} subtitle={`Semana: ${kpis.leads.week} | Mes: ${kpis.leads.month}`} icon="👥" />
+            <KPICard title="Mis Ventas" value={salesMonth} subtitle={`Meta: ${goal}`} icon="✅" />
+            <div className="bg-white rounded-xl shadow-sm border p-5">
+              <div className="flex items-start justify-between">
+                <div>
+                  <p className="text-sm text-gray-500 font-medium">Avance Meta</p>
+                  <p className={`text-2xl font-bold mt-1 ${pctMeta >= 100 ? 'text-green-600' : pctMeta >= 70 ? 'text-yellow-600' : 'text-red-600'}`}>{pctMeta}%</p>
+                </div>
+                <div className="p-2.5 bg-red-50 rounded-lg text-xl">🎯</div>
+              </div>
+              <div className="w-full h-2 bg-gray-200 rounded-full mt-3">
+                <div className="h-full bg-claro-red rounded-full transition-all" style={{ width: `${Math.min(pctMeta, 100)}%` }} />
+              </div>
+            </div>
+            <KPICard title="Comisiones Est." value={`$${kpis.estimatedCommissions.toFixed(2)}`} subtitle="Este mes" icon="💰" />
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <USDCard title="Mi Pipeline" value={kpis.pipelineOpenUSD} icon="📋" colorClass="text-blue-600" />
+            <USDCard title="Mis Ventas USD" value={kpis.salesClosedUSD} icon="🏆" colorClass="text-green-600" />
+            <USDCard title="Proyección USD" value={kpis.projectionTotalUSD} icon="🎯" colorClass="text-claro-red" />
+          </div>
+        </>
+      )}
+
+      {pipelineDist.length > 0 && (
+        <div className="bg-white rounded-xl shadow-sm border p-5">
+          <h3 className="text-sm font-semibold text-gray-700 mb-4">Mis Leads por Estado</h3>
+          <ResponsiveContainer width="100%" height={250}>
+            <PieChart>
+              <Pie data={pipelineDist} cx="50%" cy="50%" innerRadius={50} outerRadius={90} paddingAngle={3} dataKey="value"
+                label={({ name, percent }) => percent > 0.05 ? `${name} (${(percent * 100).toFixed(0)}%)` : ''}>
+                {pipelineDist.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
+              </Pie>
+              <Tooltip />
+            </PieChart>
+          </ResponsiveContainer>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function Dashboard() {
   const { user } = useAuth();
   const [kpis, setKpis] = useState(null);
@@ -49,7 +129,7 @@ export default function Dashboard() {
   const [vendorFilter, setVendorFilter] = useState('');
   const [vendors, setVendors] = useState([]);
 
-  if (user?.role === 'vendedor') return <Navigate to="/pipeline" />;
+  if (user?.role === 'vendedor') return <VendorDashboard />;
 
   useEffect(() => {
     api.get('/users/vendors').then(setVendors).catch(() => {});
