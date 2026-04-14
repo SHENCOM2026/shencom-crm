@@ -25,6 +25,20 @@ function KPICard({ title, value, subtitle, icon }) {
   );
 }
 
+function USDCard({ title, value, icon, colorClass }) {
+  return (
+    <div className="bg-white rounded-xl shadow-sm border p-5">
+      <div className="flex items-start justify-between">
+        <div>
+          <p className="text-sm text-gray-500 font-medium">{title}</p>
+          <p className={`text-2xl font-bold mt-1 ${colorClass || 'text-gray-900'}`}>${value.toFixed(2)}</p>
+        </div>
+        <div className="p-2.5 bg-green-50 rounded-lg text-xl">{icon}</div>
+      </div>
+    </div>
+  );
+}
+
 export default function Dashboard() {
   const { user } = useAuth();
   const [kpis, setKpis] = useState(null);
@@ -81,7 +95,7 @@ export default function Dashboard() {
   const metaVsReal = ranking.map(v => ({
     name: v.name.split(' ')[0],
     meta: v.goal || 0,
-    real: v.portabilities || 0
+    real: v.sales || 0
   }));
 
   return (
@@ -99,26 +113,35 @@ export default function Dashboard() {
       </div>
 
       {kpis && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
-          <KPICard title="Leads Hoy" value={kpis.leads.today} subtitle={`Semana: ${kpis.leads.week} | Mes: ${kpis.leads.month}`} icon="👥" />
-          <KPICard title="Llamadas Hoy" value={kpis.calls.today} subtitle={`Semana: ${kpis.calls.week} | Mes: ${kpis.calls.month}`} icon="📞" />
-          <KPICard title="Portabilidades" value={kpis.portabilities.month} subtitle={`Meta: ${kpis.portabilities.goal}`} icon="✅" />
-          <KPICard title="Tasa Conversión" value={`${kpis.conversionRate}%`} subtitle="Leads → Portabilidad" icon="📈" />
-          <KPICard title="Comisiones Est." value={`$${kpis.estimatedCommissions.toFixed(2)}`} subtitle="Este mes" icon="💰" />
-        </div>
+        <>
+          {/* KPI Cards Row */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <KPICard title="Leads Hoy" value={kpis.leads.today} subtitle={`Semana: ${kpis.leads.week} | Mes: ${kpis.leads.month}`} icon="👥" />
+            <KPICard title="Ventas" value={kpis.sales.month} subtitle={`Meta: ${kpis.sales.goal}`} icon="✅" />
+            <KPICard title="Tasa Conversión" value={`${kpis.conversionRate}%`} subtitle="Leads → Venta" icon="📈" />
+            <KPICard title="Comisiones Est." value={`$${kpis.estimatedCommissions.toFixed(2)}`} subtitle="Este mes" icon="💰" />
+          </div>
+
+          {/* USD Metrics Row */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <USDCard title="Pipeline abierto" value={kpis.pipelineOpenUSD} icon="📋" colorClass="text-blue-600" />
+            <USDCard title="Ventas cerradas" value={kpis.salesClosedUSD} icon="🏆" colorClass="text-green-600" />
+            <USDCard title="Proyección total USD" value={kpis.projectionTotalUSD} icon="🎯" colorClass="text-claro-red" />
+          </div>
+        </>
       )}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Ranking */}
         <div className="bg-white rounded-xl shadow-sm border p-5">
-          <h3 className="text-sm font-semibold text-gray-700 mb-4">Portabilidades por Vendedor (Ranking)</h3>
+          <h3 className="text-sm font-semibold text-gray-700 mb-4">Ventas por Vendedor (Ranking)</h3>
           <ResponsiveContainer width="100%" height={300}>
             <BarChart data={ranking.slice(0, 10)} layout="vertical">
               <CartesianGrid strokeDasharray="3 3" />
               <XAxis type="number" />
               <YAxis dataKey="name" type="category" width={100} tick={{ fontSize: 11 }} />
               <Tooltip />
-              <Bar dataKey="portabilities" name="Portabilidades" fill="#DA291C" radius={[0, 4, 4, 0]} />
+              <Bar dataKey="sales" name="Ventas" fill="#DA291C" radius={[0, 4, 4, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </div>

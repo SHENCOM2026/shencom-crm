@@ -44,11 +44,12 @@ export default function Home() {
       {/* KPI Cards */}
       <div className="grid grid-cols-2 gap-3">
         <KpiCard title="Leads Hoy" value={kpis?.leads?.today || 0} icon="👥" color="bg-blue-50 text-blue-700" />
-        <KpiCard title="Llamadas Hoy" value={kpis?.calls?.today || 0} icon="📞" color="bg-green-50 text-green-700" />
-        <KpiCard title="Portabilidades" value={kpis?.portabilities?.month || 0}
-          subtitle={`Meta: ${kpis?.portabilities?.goal || 0}`} icon="✅" color="bg-purple-50 text-purple-700" />
+        <KpiCard title="Ventas" value={kpis?.sales?.month || 0}
+          subtitle={`Meta: ${kpis?.sales?.goal || 0}`} icon="✅" color="bg-purple-50 text-purple-700" />
         <KpiCard title="Conversión" value={`${(kpis?.conversionRate || 0).toFixed(0)}%`}
           icon="📈" color="bg-orange-50 text-orange-700" />
+        <KpiCard title="Pipeline USD" value={`$${(kpis?.pipelineOpenUSD || 0).toFixed(0)}`}
+          icon="📋" color="bg-green-50 text-green-700" />
       </div>
 
       {/* Comisiones */}

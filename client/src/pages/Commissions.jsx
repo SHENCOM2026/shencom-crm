@@ -29,7 +29,7 @@ export default function Commissions() {
   if (loading) return <div className="flex items-center justify-center h-64"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-claro-red"></div></div>;
 
   const results = data?.results || [];
-  const chartData = results.map(r => ({ name: r.vendor_name.split(' ')[0], comision: r.total_commission, portabilidades: r.total_portabilities }));
+  const chartData = results.map(r => ({ name: r.vendor_name.split(' ')[0], comision: r.total_commission, ventas: r.total_portabilities }));
 
   return (
     <div className="space-y-6">
@@ -50,7 +50,7 @@ export default function Commissions() {
       {/* Summary */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <div className="bg-white rounded-xl shadow-sm border p-5">
-          <p className="text-sm text-gray-500">Total Portabilidades</p>
+          <p className="text-sm text-gray-500">Total Ventas</p>
           <p className="text-2xl font-bold text-gray-900 mt-1">{results.reduce((s, r) => s + r.total_portabilities, 0)}</p>
         </div>
         <div className="bg-white rounded-xl shadow-sm border p-5">
@@ -85,7 +85,7 @@ export default function Commissions() {
           <thead className="bg-gray-50 border-b">
             <tr>
               <th className="px-4 py-3 text-left font-semibold text-gray-600">Vendedor</th>
-              <th className="px-4 py-3 text-center font-semibold text-gray-600">Portabilidades</th>
+              <th className="px-4 py-3 text-center font-semibold text-gray-600">Ventas</th>
               <th className="px-4 py-3 text-center font-semibold text-gray-600">Meta</th>
               <th className="px-4 py-3 text-center font-semibold text-gray-600">% Meta</th>
               <th className="px-4 py-3 text-right font-semibold text-gray-600">Com. Base</th>
@@ -124,7 +124,7 @@ export default function Commissions() {
         {results.filter(r => r.portabilities.length > 0).map(r => (
           <details key={`bd-${r.vendor_id}`} className="border-t">
             <summary className="px-4 py-2 text-sm font-medium text-gray-600 cursor-pointer hover:bg-gray-50">
-              Desglose: {r.vendor_name} ({r.portabilities.length} portabilidades)
+              Desglose: {r.vendor_name} ({r.portabilities.length} ventas)
             </summary>
             <div className="px-4 pb-3">
               <table className="w-full text-xs">

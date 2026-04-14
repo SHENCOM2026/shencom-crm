@@ -19,9 +19,7 @@ function getActivityVendorFilter(user) {
 
 router.get('/kpis', (req, res) => {
   const vf = getVendorFilter(req.user);
-  const af = getActivityVendorFilter(req.user);
   const vendorFilter = req.query.vendor_id ? `AND l.vendor_id = ${req.query.vendor_id}` : vf;
-  const actFilter = req.query.vendor_id ? `AND a.user_id = ${req.query.vendor_id}` : af;
 
   const today = new Date().toISOString().split('T')[0];
   const weekAgo = new Date(Date.now() - 7 * 86400000).toISOString().split('T')[0];
@@ -32,13 +30,8 @@ router.get('/kpis', (req, res) => {
   const leadsWeek = db.prepare(`SELECT COUNT(*) as c FROM leads l WHERE date(l.created_at) >= ? ${vendorFilter}`).get(weekAgo).c;
   const leadsMonth = db.prepare(`SELECT COUNT(*) as c FROM leads l WHERE date(l.created_at) >= ? ${vendorFilter}`).get(monthStart).c;
 
-  // Call counts
-  const callsToday = db.prepare(`SELECT COUNT(*) as c FROM lead_activities a WHERE date(a.created_at) = ? AND a.activity_type IN ('llamada_saliente','llamada_entrante') ${actFilter}`).get(today).c;
-  const callsWeek = db.prepare(`SELECT COUNT(*) as c FROM lead_activities a WHERE date(a.created_at) >= ? AND a.activity_type IN ('llamada_saliente','llamada_entrante') ${actFilter}`).get(weekAgo).c;
-  const callsMonth = db.prepare(`SELECT COUNT(*) as c FROM lead_activities a WHERE date(a.created_at) >= ? AND a.activity_type IN ('llamada_saliente','llamada_entrante') ${actFilter}`).get(monthStart).c;
-
-  // Portabilities
-  const portMonth = db.prepare(`SELECT COUNT(*) as c FROM leads l WHERE l.pipeline_status = 'portabilidad_exitosa' AND date(l.activation_date) >= ? ${vendorFilter}`).get(monthStart).c;
+  // Ventas (portabilidades exitosas)
+  const salesMonth = db.prepare(`SELECT COUNT(*) as c FROM leads l WHERE l.pipeline_status = 'portabilidad_exitosa' AND date(l.activation_date) >= ? ${vendorFilter}`).get(monthStart).c;
 
   // Monthly goal
   let goalTotal = 0;
@@ -65,12 +58,32 @@ router.get('/kpis', (req, res) => {
     AND date(l.activation_date) >= ? ${vendorFilter}
   `).get(monthStart).total;
 
+  // Pipeline abierto (USD) - leads activos NO ganados
+  const pipelineOpen = db.prepare(`
+    SELECT COALESCE(SUM(l.prospect_total), 0) as total
+    FROM leads l
+    WHERE l.pipeline_status != 'portabilidad_exitosa'
+    AND l.pipeline_status != 'rechazado_perdido' ${vendorFilter}
+  `).get().total;
+
+  // Ventas cerradas (USD) - leads ganados
+  const salesClosed = db.prepare(`
+    SELECT COALESCE(SUM(l.prospect_total), 0) as total
+    FROM leads l
+    WHERE l.pipeline_status = 'portabilidad_exitosa' ${vendorFilter}
+  `).get().total;
+
+  // Proyección total
+  const projectionTotal = pipelineOpen + salesClosed;
+
   res.json({
     leads: { today: leadsToday, week: leadsWeek, month: leadsMonth },
-    calls: { today: callsToday, week: callsWeek, month: callsMonth },
-    portabilities: { month: portMonth, goal: goalTotal },
+    sales: { month: salesMonth, goal: goalTotal },
     conversionRate: parseFloat(conversionRate),
-    estimatedCommissions: commissions
+    estimatedCommissions: commissions,
+    pipelineOpenUSD: pipelineOpen,
+    salesClosedUSD: salesClosed,
+    projectionTotalUSD: projectionTotal
   });
 });
 
@@ -87,7 +100,7 @@ router.get('/pipeline', (req, res) => {
   res.json(data);
 });
 
-// Portabilities by vendor (ranking)
+// Ventas por vendedor (ranking)
 router.get('/ranking', (req, res) => {
   const monthStart = new Date().toISOString().substring(0, 7) + '-01';
   let filter = '';
@@ -97,14 +110,14 @@ router.get('/ranking', (req, res) => {
 
   const data = db.prepare(`
     SELECT u.full_name as name, u.monthly_portability_goal as goal,
-      COUNT(l.id) as portabilities
+      COUNT(l.id) as sales
     FROM users u
     LEFT JOIN leads l ON l.vendor_id = u.id
       AND l.pipeline_status = 'portabilidad_exitosa'
       AND date(l.activation_date) >= ?
     WHERE u.role = 'vendedor' AND u.active = 1 ${filter.replace('l.vendor_id', 'u.id')}
     GROUP BY u.id
-    ORDER BY portabilities DESC
+    ORDER BY sales DESC
   `).all(monthStart);
   res.json(data);
 });

@@ -45,7 +45,7 @@ export default function Commissions() {
               <p className="text-2xl font-bold text-green-600 mt-1">${total.toFixed(2)}</p>
             </div>
             <div className="card text-center">
-              <p className="text-xs text-gray-500">Portabilidades</p>
+              <p className="text-xs text-gray-500">Ventas</p>
               <p className="text-2xl font-bold text-claro-red mt-1">{totalPort}</p>
             </div>
           </div>
@@ -58,7 +58,7 @@ export default function Commissions() {
                 <div key={i} className="card flex items-center justify-between">
                   <div>
                     <p className="font-medium text-sm">{v.vendor_name}</p>
-                    <p className="text-xs text-gray-500">{v.portabilities} portabilidades · Meta: {v.goal || 0}</p>
+                    <p className="text-xs text-gray-500">{v.portabilities} ventas · Meta: {v.goal || 0}</p>
                     {v.goal > 0 && (
                       <div className="w-32 h-1.5 bg-gray-200 rounded-full mt-1.5">
                         <div className="h-full bg-claro-red rounded-full transition-all"

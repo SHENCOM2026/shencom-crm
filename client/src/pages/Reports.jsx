@@ -10,7 +10,7 @@ const COLORS = ['#DA291C', '#333333', '#F59E0B', '#10B981', '#3B82F6', '#8B5CF6'
 
 const reportTypes = [
   { id: 'daily', name: 'Reporte Diario de Gestión', desc: 'Llamadas y resultados por vendedor' },
-  { id: 'portabilities', name: 'Portabilidades', desc: 'Portabilidades completadas por periodo' },
+  { id: 'portabilities', name: 'Ventas', desc: 'Ventas completadas por periodo' },
   { id: 'by-source', name: 'Leads por Fuente', desc: 'Análisis de conversión por fuente' },
   { id: 'pipeline-time', name: 'Tiempo en Pipeline', desc: 'Días promedio para cerrar un lead' },
   { id: 'aging', name: 'Aging de Leads', desc: 'Leads sin gestión reciente' },
@@ -205,7 +205,7 @@ export default function Reports() {
                 </div>
                 <div className="text-center">
                   <p className="text-3xl font-bold text-gray-700">{data.total || 0}</p>
-                  <p className="text-sm text-gray-500 mt-1">Portabilidades</p>
+                  <p className="text-sm text-gray-500 mt-1">Ventas</p>
                 </div>
               </div>
             ) : <p className="text-gray-500 text-center">Sin datos</p>}

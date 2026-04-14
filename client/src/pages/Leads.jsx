@@ -424,6 +424,7 @@ export default function Leads() {
                 <th className="px-4 py-3 text-left font-semibold text-gray-600">Fuente</th>
                 <th className="px-4 py-3 text-left font-semibold text-gray-600">Estado</th>
                 <th className="px-4 py-3 text-left font-semibold text-gray-600">Vendedor</th>
+                <th className="px-4 py-3 text-right font-semibold text-gray-600">Valor USD</th>
                 <th className="px-4 py-3 text-left font-semibold text-gray-600">Creado</th>
                 <th className="px-4 py-3 text-right font-semibold text-gray-600">Acciones</th>
               </tr>
@@ -445,6 +446,11 @@ export default function Leads() {
                     <td className="px-4 py-3 text-gray-500 text-xs">{lead.source_name || '—'}</td>
                     <td className="px-4 py-3"><span className={`px-2 py-0.5 rounded text-xs font-medium ${info.color}`}>{info.label}</span></td>
                     <td className="px-4 py-3 text-gray-500">{lead.vendor_name || '—'}</td>
+                    <td className="px-4 py-3 text-right font-medium">
+                      {lead.prospect_total > 0
+                        ? <span className="text-green-600">${parseFloat(lead.prospect_total).toFixed(2)}</span>
+                        : <span className="text-gray-400">$0.00</span>}
+                    </td>
                     <td className="px-4 py-3 text-gray-500 text-xs">{formatDate(lead.created_at)}</td>
                     <td className="px-4 py-3 text-right" onClick={e => e.stopPropagation()}>
                       <button onClick={() => { setEditingLead(lead); setShowModal(true); }} className="p-1.5 hover:bg-gray-100 rounded-lg text-gray-500">✏️</button>

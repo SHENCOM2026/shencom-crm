@@ -103,7 +103,7 @@ function UserModal({ isOpen, onClose, onSave, editUser, supervisors, currentUser
               </div>
             )}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Meta portabilidades/mes</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Meta ventas/mes</label>
               <input type="number" value={form.monthly_portability_goal} onChange={e => set('monthly_portability_goal', parseInt(e.target.value) || 0)}
                 className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-claro-red outline-none" />
             </div>
@@ -191,7 +191,7 @@ function UserCard({ u, roleColors, onEdit, onViewLog, canEdit }) {
             {u.phone && ` | ${u.phone}`}
           </p>
           {u.role !== 'gerente' && (
-            <p className="text-xs text-gray-400">Meta: {u.monthly_portability_goal} port/mes | {u.daily_call_goal} llam/día</p>
+            <p className="text-xs text-gray-400">Meta: {u.monthly_portability_goal} ventas/mes | {u.daily_call_goal} llam/día</p>
           )}
         </div>
         <span className={`px-2 py-0.5 rounded text-xs font-medium ${roleColors[u.role]}`}>{u.role}</span>
@@ -312,7 +312,7 @@ export default function Users() {
                 className="px-2.5 py-1 text-xs text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg">Actividad</button>
             </div>
           </div>
-          <p className="text-xs text-gray-500 mb-3">Meta: {supervisor.monthly_portability_goal} port/mes | {supervisor.daily_call_goal} llamadas/día</p>
+          <p className="text-xs text-gray-500 mb-3">Meta: {supervisor.monthly_portability_goal} ventas/mes | {supervisor.daily_call_goal} llamadas/día</p>
           <div className="space-y-2">
             {vendedores.map(v => (
               <UserCard key={v.id} u={v} roleColors={roleColors}
