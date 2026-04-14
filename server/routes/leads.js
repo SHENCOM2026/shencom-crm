@@ -63,7 +63,8 @@ router.get('/', (req, res) => {
   const leads = db.prepare(`
     SELECT l.*, v.full_name as vendor_name, s.full_name as supervisor_name,
       o.name as operator_name, ls.name as source_name, cp.name as claro_plan_name,
-      rr.name as rejection_reason_name
+      rr.name as rejection_reason_name,
+      l.lines_to_port, l.prospect_total
     FROM leads l
     LEFT JOIN users v ON l.vendor_id = v.id
     LEFT JOIN users s ON l.supervisor_id = s.id
@@ -107,17 +108,42 @@ router.get('/:id', (req, res) => {
     ORDER BY a.created_at DESC
   `).all(req.params.id);
 
-  res.json({ ...lead, activities });
+  // Get prospect plans
+  const prospect_plans = db.prepare(
+    'SELECT * FROM lead_prospect_plans WHERE lead_id = ? ORDER BY id'
+  ).all(req.params.id);
+
+  res.json({ ...lead, activities, prospect_plans });
 });
 
 // Create lead
 router.post('/', (req, res) => {
   const { full_name, cedula, phone_primary, phone_secondary, email,
     operator_origin_id, current_plan, claro_plan_id, vendor_id,
-    supervisor_id, source_id, notes, next_followup } = req.body;
+    supervisor_id, source_id, notes, next_followup,
+    lines_to_port, prospect_plans } = req.body;
 
   if (!full_name || !phone_primary) {
     return res.status(400).json({ error: 'Nombre y teléfono son requeridos' });
+  }
+
+  // Validate prospect plans if provided
+  if (prospect_plans && prospect_plans.length > 0) {
+    for (let i = 0; i < prospect_plans.length; i++) {
+      const p = prospect_plans[i];
+      if (!p.plan_name || !p.plan_name.trim()) {
+        return res.status(400).json({ error: `Plan ${i + 1}: el nombre es requerido` });
+      }
+      if (p.plan_price === undefined || p.plan_price === '' || parseFloat(p.plan_price) < 0) {
+        return res.status(400).json({ error: `Plan ${i + 1}: la tarifa debe ser un valor positivo` });
+      }
+    }
+    if (lines_to_port && parseInt(lines_to_port) > 0) {
+      const total = prospect_plans.reduce((sum, p) => sum + parseFloat(p.plan_price || 0), 0);
+      if (total <= 0) {
+        return res.status(400).json({ error: 'El valor total prospectado no puede ser $0 si hay líneas registradas' });
+      }
+    }
   }
 
   // Check duplicates
@@ -134,21 +160,40 @@ router.post('/', (req, res) => {
 
   const assignedVendor = req.user.role === 'vendedor' ? req.user.id : (vendor_id || req.user.id);
   const assignedSupervisor = supervisor_id || null;
+  const prospectTotal = (prospect_plans || []).reduce((sum, p) => sum + parseFloat(p.plan_price || 0), 0);
 
-  const result = db.prepare(`
-    INSERT INTO leads (full_name, cedula, phone_primary, phone_secondary, email,
-      operator_origin_id, current_plan, claro_plan_id, vendor_id, supervisor_id,
-      source_id, notes, next_followup)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `).run(full_name, cedula || null, phone_primary, phone_secondary || null,
-    email || null, operator_origin_id || null, current_plan || null,
-    claro_plan_id || null, assignedVendor, assignedSupervisor,
-    source_id || null, notes || null, next_followup || null);
+  const createLead = db.transaction(() => {
+    const result = db.prepare(`
+      INSERT INTO leads (full_name, cedula, phone_primary, phone_secondary, email,
+        operator_origin_id, current_plan, claro_plan_id, vendor_id, supervisor_id,
+        source_id, notes, next_followup, lines_to_port, prospect_total)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(full_name, cedula || null, phone_primary, phone_secondary || null,
+      email || null, operator_origin_id || null, current_plan || null,
+      claro_plan_id || null, assignedVendor, assignedSupervisor,
+      source_id || null, notes || null, next_followup || null,
+      parseInt(lines_to_port) || 0, prospectTotal);
 
-  db.prepare('INSERT INTO user_activity_log (user_id, action, details) VALUES (?, ?, ?)')
-    .run(req.user.id, 'create_lead', `Lead: ${full_name}`);
+    const leadId = result.lastInsertRowid;
 
-  res.status(201).json({ id: result.lastInsertRowid, message: 'Lead creado' });
+    // Insert prospect plans
+    if (prospect_plans && prospect_plans.length > 0) {
+      const insertPlan = db.prepare(
+        'INSERT INTO lead_prospect_plans (lead_id, plan_name, plan_price) VALUES (?, ?, ?)'
+      );
+      prospect_plans.forEach(p => {
+        insertPlan.run(leadId, p.plan_name.trim(), parseFloat(p.plan_price) || 0);
+      });
+    }
+
+    db.prepare('INSERT INTO user_activity_log (user_id, action, details) VALUES (?, ?, ?)')
+      .run(req.user.id, 'create_lead', `Lead: ${full_name}`);
+
+    return leadId;
+  });
+
+  const leadId = createLead();
+  res.status(201).json({ id: leadId, message: 'Lead creado' });
 });
 
 // Update lead
@@ -163,7 +208,21 @@ router.put('/:id', (req, res) => {
   const { full_name, cedula, phone_primary, phone_secondary, email,
     operator_origin_id, current_plan, claro_plan_id, vendor_id,
     supervisor_id, source_id, pipeline_status, claro_request_number,
-    activation_date, rejection_reason_id, next_followup, notes } = req.body;
+    activation_date, rejection_reason_id, next_followup, notes,
+    lines_to_port, prospect_plans } = req.body;
+
+  // Validate prospect plans if provided
+  if (prospect_plans && prospect_plans.length > 0) {
+    for (let i = 0; i < prospect_plans.length; i++) {
+      const p = prospect_plans[i];
+      if (!p.plan_name || !p.plan_name.trim()) {
+        return res.status(400).json({ error: `Plan ${i + 1}: el nombre es requerido` });
+      }
+      if (p.plan_price === undefined || p.plan_price === '' || parseFloat(p.plan_price) < 0) {
+        return res.status(400).json({ error: `Plan ${i + 1}: la tarifa debe ser un valor positivo` });
+      }
+    }
+  }
 
   // Check duplicates on update
   if (cedula && cedula !== lead.cedula) {
@@ -180,27 +239,50 @@ router.put('/:id', (req, res) => {
     );
   }
 
-  db.prepare(`
-    UPDATE leads SET full_name = ?, cedula = ?, phone_primary = ?, phone_secondary = ?,
-      email = ?, operator_origin_id = ?, current_plan = ?, claro_plan_id = ?,
-      vendor_id = ?, supervisor_id = ?, source_id = ?, pipeline_status = ?,
-      claro_request_number = ?, activation_date = ?, rejection_reason_id = ?,
-      next_followup = ?, notes = ?, updated_at = datetime('now')
-    WHERE id = ?
-  `).run(
-    full_name || lead.full_name, cedula || lead.cedula,
-    phone_primary || lead.phone_primary, phone_secondary ?? lead.phone_secondary,
-    email ?? lead.email, operator_origin_id ?? lead.operator_origin_id,
-    current_plan ?? lead.current_plan, claro_plan_id ?? lead.claro_plan_id,
-    vendor_id || lead.vendor_id, supervisor_id ?? lead.supervisor_id,
-    source_id ?? lead.source_id, pipeline_status || lead.pipeline_status,
-    claro_request_number ?? lead.claro_request_number,
-    activation_date ?? lead.activation_date,
-    rejection_reason_id ?? lead.rejection_reason_id,
-    next_followup ?? lead.next_followup, notes ?? lead.notes,
-    req.params.id
-  );
+  const prospectTotal = prospect_plans !== undefined
+    ? (prospect_plans || []).reduce((sum, p) => sum + parseFloat(p.plan_price || 0), 0)
+    : lead.prospect_total;
 
+  const updateLead = db.transaction(() => {
+    db.prepare(`
+      UPDATE leads SET full_name = ?, cedula = ?, phone_primary = ?, phone_secondary = ?,
+        email = ?, operator_origin_id = ?, current_plan = ?, claro_plan_id = ?,
+        vendor_id = ?, supervisor_id = ?, source_id = ?, pipeline_status = ?,
+        claro_request_number = ?, activation_date = ?, rejection_reason_id = ?,
+        next_followup = ?, notes = ?, lines_to_port = ?, prospect_total = ?,
+        updated_at = datetime('now')
+      WHERE id = ?
+    `).run(
+      full_name || lead.full_name, cedula || lead.cedula,
+      phone_primary || lead.phone_primary, phone_secondary ?? lead.phone_secondary,
+      email ?? lead.email, operator_origin_id ?? lead.operator_origin_id,
+      current_plan ?? lead.current_plan, claro_plan_id ?? lead.claro_plan_id,
+      vendor_id || lead.vendor_id, supervisor_id ?? lead.supervisor_id,
+      source_id ?? lead.source_id, pipeline_status || lead.pipeline_status,
+      claro_request_number ?? lead.claro_request_number,
+      activation_date ?? lead.activation_date,
+      rejection_reason_id ?? lead.rejection_reason_id,
+      next_followup ?? lead.next_followup, notes ?? lead.notes,
+      lines_to_port !== undefined ? (parseInt(lines_to_port) || 0) : (lead.lines_to_port || 0),
+      prospectTotal,
+      req.params.id
+    );
+
+    // Update prospect plans if provided
+    if (prospect_plans !== undefined) {
+      db.prepare('DELETE FROM lead_prospect_plans WHERE lead_id = ?').run(req.params.id);
+      if (prospect_plans && prospect_plans.length > 0) {
+        const insertPlan = db.prepare(
+          'INSERT INTO lead_prospect_plans (lead_id, plan_name, plan_price) VALUES (?, ?, ?)'
+        );
+        prospect_plans.forEach(p => {
+          insertPlan.run(req.params.id, p.plan_name.trim(), parseFloat(p.plan_price) || 0);
+        });
+      }
+    }
+  });
+
+  updateLead();
   res.json({ message: 'Lead actualizado' });
 });
 

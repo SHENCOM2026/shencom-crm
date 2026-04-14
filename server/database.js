@@ -126,6 +126,14 @@ db.exec(`
     created_at TEXT DEFAULT (datetime('now'))
   );
 
+  CREATE TABLE IF NOT EXISTS lead_prospect_plans (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    lead_id INTEGER NOT NULL REFERENCES leads(id) ON DELETE CASCADE,
+    plan_name TEXT NOT NULL,
+    plan_price REAL NOT NULL DEFAULT 0,
+    created_at TEXT DEFAULT (datetime('now'))
+  );
+
   CREATE INDEX IF NOT EXISTS idx_leads_vendor ON leads(vendor_id);
   CREATE INDEX IF NOT EXISTS idx_leads_supervisor ON leads(supervisor_id);
   CREATE INDEX IF NOT EXISTS idx_leads_status ON leads(pipeline_status);
@@ -134,6 +142,14 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_activities_lead ON lead_activities(lead_id);
   CREATE INDEX IF NOT EXISTS idx_activities_user ON lead_activities(user_id);
   CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(user_id);
+  CREATE INDEX IF NOT EXISTS idx_prospect_plans_lead ON lead_prospect_plans(lead_id);
 `);
+
+// Migration: add new columns if they don't exist
+try { db.exec("ALTER TABLE leads ADD COLUMN lines_to_port INTEGER DEFAULT 0"); } catch(e) {}
+try { db.exec("ALTER TABLE leads ADD COLUMN prospect_total REAL DEFAULT 0"); } catch(e) {}
+try { db.exec("ALTER TABLE users ADD COLUMN phone TEXT"); } catch(e) {}
+try { db.exec("ALTER TABLE users ADD COLUMN modified_by INTEGER"); } catch(e) {}
+try { db.exec("ALTER TABLE users ADD COLUMN modified_at TEXT"); } catch(e) {}
 
 module.exports = db;

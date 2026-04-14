@@ -76,6 +76,35 @@ export default function LeadDetail() {
               {lead.activation_date && <div className="flex justify-between"><span className="text-gray-500">F. Activación:</span><span>{formatDate(lead.activation_date)}</span></div>}
             </div>
 
+            {/* Prospection data */}
+            {(lead.lines_to_port > 0 || (lead.prospect_plans && lead.prospect_plans.length > 0)) && (
+              <div className="mt-4 pt-4 border-t">
+                <p className="text-sm text-gray-500 font-medium mb-2">Prospección:</p>
+                {lead.lines_to_port > 0 && (
+                  <div className="flex justify-between text-sm mb-1">
+                    <span className="text-gray-500">Líneas a portar:</span>
+                    <span className="font-semibold">{lead.lines_to_port}</span>
+                  </div>
+                )}
+                {lead.prospect_plans && lead.prospect_plans.length > 0 && (
+                  <div className="space-y-1 mb-2">
+                    {lead.prospect_plans.map((pp, i) => (
+                      <div key={i} className="flex justify-between text-sm bg-gray-50 rounded px-2 py-1">
+                        <span className="text-gray-700 truncate">{pp.plan_name}</span>
+                        <span className="text-gray-900 font-medium ml-2">${parseFloat(pp.plan_price).toFixed(2)}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {lead.prospect_total > 0 && (
+                  <div className="flex justify-between text-sm bg-red-50 rounded-lg px-3 py-2">
+                    <span className="text-claro-red font-medium">Total prospectado:</span>
+                    <span className="text-claro-red font-bold">${parseFloat(lead.prospect_total).toFixed(2)}</span>
+                  </div>
+                )}
+              </div>
+            )}
+
             {lead.notes && (
               <div className="mt-4 pt-4 border-t">
                 <p className="text-sm text-gray-500 font-medium mb-1">Notas:</p>

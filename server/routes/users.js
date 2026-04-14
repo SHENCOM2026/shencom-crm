@@ -8,10 +8,13 @@ router.use(authMiddleware);
 
 // List users
 router.get('/', (req, res) => {
-  let query = `SELECT u.id, u.username, u.full_name, u.email, u.role, u.supervisor_id,
+  let query = `SELECT u.id, u.username, u.full_name, u.email, u.phone, u.role, u.supervisor_id,
     u.monthly_portability_goal, u.daily_call_goal, u.active, u.created_at,
-    s.full_name as supervisor_name
-    FROM users u LEFT JOIN users s ON u.supervisor_id = s.id`;
+    u.modified_by, u.modified_at,
+    s.full_name as supervisor_name,
+    m.full_name as modified_by_name
+    FROM users u LEFT JOIN users s ON u.supervisor_id = s.id
+    LEFT JOIN users m ON u.modified_by = m.id`;
 
   if (req.user.role === 'supervisor') {
     query += ` WHERE u.supervisor_id = ${req.user.id} OR u.id = ${req.user.id}`;
@@ -44,7 +47,7 @@ router.get('/supervisors', (req, res) => {
 
 // Create user
 router.post('/', requireRole('gerente'), (req, res) => {
-  const { username, password, full_name, email, role, supervisor_id, monthly_portability_goal, daily_call_goal } = req.body;
+  const { username, password, full_name, email, phone, role, supervisor_id, monthly_portability_goal, daily_call_goal } = req.body;
 
   if (!username || !password || !full_name || !role) {
     return res.status(400).json({ error: 'Campos requeridos: username, password, full_name, role' });
@@ -57,9 +60,9 @@ router.post('/', requireRole('gerente'), (req, res) => {
 
   const hashed = bcrypt.hashSync(password, 10);
   const result = db.prepare(`
-    INSERT INTO users (username, password, full_name, email, role, supervisor_id, monthly_portability_goal, daily_call_goal)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-  `).run(username, hashed, full_name, email || null, role, supervisor_id || null,
+    INSERT INTO users (username, password, full_name, email, phone, role, supervisor_id, monthly_portability_goal, daily_call_goal)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(username, hashed, full_name, email || null, phone || null, role, supervisor_id || null,
     monthly_portability_goal || 30, daily_call_goal || 40);
 
   db.prepare('INSERT INTO user_activity_log (user_id, action, details) VALUES (?, ?, ?)')
@@ -70,13 +73,20 @@ router.post('/', requireRole('gerente'), (req, res) => {
 
 // Update user
 router.put('/:id', requireRole('gerente'), (req, res) => {
-  const { full_name, email, role, supervisor_id, monthly_portability_goal, daily_call_goal, active, password } = req.body;
+  const { full_name, email, phone, role, supervisor_id, monthly_portability_goal, daily_call_goal, active, password } = req.body;
   const userId = req.params.id;
 
-  let query = `UPDATE users SET full_name = ?, email = ?, role = ?, supervisor_id = ?,
-    monthly_portability_goal = ?, daily_call_goal = ?, active = ?, updated_at = datetime('now')`;
-  let params = [full_name, email || null, role, supervisor_id || null,
-    monthly_portability_goal || 30, daily_call_goal || 40, active !== undefined ? active : 1];
+  // Prevent gerente from changing their own password through this endpoint
+  if (password && parseInt(userId) === req.user.id) {
+    return res.status(400).json({ error: 'No puede cambiar su propia contraseña desde este panel. Use su perfil.' });
+  }
+
+  let query = `UPDATE users SET full_name = ?, email = ?, phone = ?, role = ?, supervisor_id = ?,
+    monthly_portability_goal = ?, daily_call_goal = ?, active = ?,
+    modified_by = ?, modified_at = datetime('now'), updated_at = datetime('now')`;
+  let params = [full_name, email || null, phone || null, role, supervisor_id || null,
+    monthly_portability_goal || 30, daily_call_goal || 40, active !== undefined ? active : 1,
+    req.user.id];
 
   if (password) {
     query += ', password = ?';
@@ -87,6 +97,10 @@ router.put('/:id', requireRole('gerente'), (req, res) => {
   params.push(userId);
 
   db.prepare(query).run(...params);
+
+  db.prepare('INSERT INTO user_activity_log (user_id, action, details) VALUES (?, ?, ?)')
+    .run(req.user.id, 'update_user', `Updated user ID: ${userId}, fields: ${Object.keys(req.body).filter(k => k !== 'password').join(', ')}`);
+
   res.json({ message: 'Usuario actualizado' });
 });
 

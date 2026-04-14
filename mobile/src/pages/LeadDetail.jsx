@@ -89,6 +89,32 @@ export default function LeadDetail() {
             <InfoRow label="Fuente" value={lead.source_name} />
             <InfoRow label="Vendedor" value={lead.vendor_name} />
             <InfoRow label="Creado" value={formatDateTime(lead.created_at)} />
+
+            {/* Prospect data */}
+            {(lead.lines_to_port > 0 || (lead.prospect_plans && lead.prospect_plans.length > 0)) && (
+              <div className="card">
+                <p className="text-xs text-gray-500 mb-2 font-medium">Prospección</p>
+                {lead.lines_to_port > 0 && (
+                  <div className="flex justify-between text-sm mb-1">
+                    <span className="text-gray-500">Líneas a portar:</span>
+                    <span className="font-semibold">{lead.lines_to_port}</span>
+                  </div>
+                )}
+                {lead.prospect_plans && lead.prospect_plans.map((pp, i) => (
+                  <div key={i} className="flex justify-between text-sm bg-gray-50 rounded px-2 py-1 mb-1">
+                    <span className="text-gray-700 truncate">{pp.plan_name}</span>
+                    <span className="font-medium ml-2">${parseFloat(pp.plan_price).toFixed(2)}</span>
+                  </div>
+                ))}
+                {lead.prospect_total > 0 && (
+                  <div className="flex justify-between text-sm bg-red-50 rounded-lg px-3 py-2 mt-1">
+                    <span className="text-claro-red font-medium">Total:</span>
+                    <span className="text-claro-red font-bold">${parseFloat(lead.prospect_total).toFixed(2)}</span>
+                  </div>
+                )}
+              </div>
+            )}
+
             {lead.notes && <div className="card"><p className="text-xs text-gray-500 mb-1">Notas</p><p className="text-sm">{lead.notes}</p></div>}
 
             {/* Change status */}

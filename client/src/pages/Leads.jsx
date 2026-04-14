@@ -8,30 +8,76 @@ import toast from 'react-hot-toast';
 /* ───── Lead Form Modal ───── */
 function LeadModal({ isOpen, onClose, onSave, lead, vendors, supervisors, plans, operators, sources }) {
   const [form, setForm] = useState({});
+  const [prospectPlans, setProspectPlans] = useState([]);
+  const [planErrors, setPlanErrors] = useState('');
 
   useEffect(() => {
     if (lead) {
       setForm({ ...lead });
+      // Load existing prospect plans when editing
+      if (lead.id) {
+        api.get(`/leads/${lead.id}`).then(data => {
+          setProspectPlans(data.prospect_plans || []);
+        }).catch(() => {});
+      }
     } else {
       setForm({
         full_name: '', cedula: '', phone_primary: '', phone_secondary: '', email: '',
         operator_origin_id: '', current_plan: '', claro_plan_id: '',
         vendor_id: '', supervisor_id: '', source_id: '',
-        pipeline_status: 'lead_nuevo', next_followup: '', notes: ''
+        pipeline_status: 'lead_nuevo', next_followup: '', notes: '',
+        lines_to_port: ''
       });
+      setProspectPlans([]);
     }
+    setPlanErrors('');
   }, [lead, isOpen]);
 
   if (!isOpen) return null;
 
+  const prospectTotal = prospectPlans.reduce((sum, p) => sum + (parseFloat(p.plan_price) || 0), 0);
+
+  const addProspectPlan = () => {
+    setProspectPlans(prev => [...prev, { plan_name: '', plan_price: '' }]);
+  };
+
+  const removeProspectPlan = (index) => {
+    setProspectPlans(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const updateProspectPlan = (index, field, value) => {
+    setProspectPlans(prev => prev.map((p, i) => i === index ? { ...p, [field]: value } : p));
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setPlanErrors('');
+
+    // Validate prospect plans
+    if (prospectPlans.length > 0) {
+      for (let i = 0; i < prospectPlans.length; i++) {
+        if (!prospectPlans[i].plan_name?.trim()) {
+          setPlanErrors(`Plan ${i + 1}: ingrese el nombre del plan`);
+          return;
+        }
+        if (!prospectPlans[i].plan_price && prospectPlans[i].plan_price !== 0) {
+          setPlanErrors(`Plan ${i + 1}: ingrese la tarifa`);
+          return;
+        }
+      }
+    }
+    if (parseInt(form.lines_to_port) > 0 && prospectPlans.length > 0 && prospectTotal <= 0) {
+      setPlanErrors('El valor total no puede ser $0 si hay líneas registradas');
+      return;
+    }
+
     try {
+      const data = { ...form, prospect_plans: prospectPlans };
       if (lead) {
-        await api.put(`/leads/${lead.id}`, form);
+        await api.put(`/leads/${lead.id}`, data);
         toast.success('Lead actualizado');
       } else {
-        await api.post('/leads', form);
+        await api.post('/leads', data);
         toast.success('Lead creado');
       }
       onSave();
@@ -125,6 +171,57 @@ function LeadModal({ isOpen, onClose, onSave, lead, vendors, supervisors, plans,
                 className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-claro-red outline-none" />
             </div>
           </div>
+
+          {/* ── Prospección de líneas y planes ── */}
+          <div className="border-t pt-4">
+            <h4 className="text-sm font-semibold text-gray-800 mb-3">Prospección de Líneas</h4>
+            <div className="mb-3">
+              <label className="block text-sm font-medium text-gray-700 mb-1">Líneas a portar</label>
+              <input type="number" min="0" step="1" value={form.lines_to_port || ''} onChange={e => set('lines_to_port', e.target.value)}
+                placeholder="Ej: 3"
+                className="w-full sm:w-40 px-3 py-2 border rounded-lg focus:ring-2 focus:ring-claro-red outline-none" />
+            </div>
+
+            <div className="mb-2 flex items-center justify-between">
+              <label className="block text-sm font-medium text-gray-700">Planes prospectados</label>
+              <button type="button" onClick={addProspectPlan}
+                className="text-xs px-2.5 py-1 bg-green-50 text-green-700 rounded-lg hover:bg-green-100 font-medium">
+                + Agregar plan
+              </button>
+            </div>
+            {prospectPlans.length > 0 && (
+              <div className="space-y-2 mb-3">
+                {prospectPlans.map((pp, i) => (
+                  <div key={i} className="flex items-center gap-2">
+                    <input type="text" value={pp.plan_name} onChange={e => updateProspectPlan(i, 'plan_name', e.target.value)}
+                      placeholder="Nombre / tipo de plan"
+                      className="flex-1 px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-claro-red outline-none" />
+                    <div className="relative w-32">
+                      <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 text-sm">$</span>
+                      <input type="number" min="0" step="0.01" value={pp.plan_price} onChange={e => updateProspectPlan(i, 'plan_price', e.target.value)}
+                        placeholder="0.00"
+                        className="w-full pl-6 pr-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-claro-red outline-none" />
+                    </div>
+                    <button type="button" onClick={() => removeProspectPlan(i)}
+                      className="p-1.5 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg" title="Eliminar plan">
+                      ✕
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+            {prospectPlans.length === 0 && (
+              <p className="text-xs text-gray-400 mb-3">No hay planes agregados. Presione "+ Agregar plan" para iniciar.</p>
+            )}
+
+            {planErrors && <p className="text-xs text-red-600 mb-2">{planErrors}</p>}
+
+            <div className="bg-gray-50 rounded-lg p-3 flex items-center justify-between">
+              <span className="text-sm font-medium text-gray-600">Valor total prospectado:</span>
+              <span className="text-lg font-bold text-claro-red">${prospectTotal.toFixed(2)}</span>
+            </div>
+          </div>
+
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Notas</label>
             <textarea value={form.notes || ''} onChange={e => set('notes', e.target.value)} rows={3}

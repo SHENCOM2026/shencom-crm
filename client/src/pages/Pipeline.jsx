@@ -98,9 +98,17 @@ function LeadCard({ lead }) {
         {lead.vendor_name && <p className="text-xs text-gray-500">👤 {lead.vendor_name}</p>}
         {lead.next_followup && <p className="text-xs text-amber-600">⏰ {formatDate(lead.next_followup)}</p>}
       </div>
-      {lead.claro_plan_name && (
-        <div className="mt-2 text-xs bg-red-50 text-claro-red px-2 py-1 rounded-md inline-block">{lead.claro_plan_name}</div>
-      )}
+      <div className="mt-2 flex flex-wrap gap-1">
+        {lead.claro_plan_name && (
+          <span className="text-xs bg-red-50 text-claro-red px-2 py-1 rounded-md">{lead.claro_plan_name}</span>
+        )}
+        {lead.prospect_total > 0 && (
+          <span className="text-xs bg-green-50 text-green-700 px-2 py-1 rounded-md font-medium">${parseFloat(lead.prospect_total).toFixed(2)}</span>
+        )}
+        {lead.lines_to_port > 0 && (
+          <span className="text-xs bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded-md">{lead.lines_to_port} lín.</span>
+        )}
+      </div>
     </div>
   );
 }

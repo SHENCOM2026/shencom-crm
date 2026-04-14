@@ -114,17 +114,29 @@ function NewLeadModal({ operators, plans, sources, onClose, onSave }) {
   const [form, setForm] = useState({
     full_name: '', cedula: '', phone_primary: '', phone_secondary: '', email: '',
     operator_origin_id: '', current_plan: '', claro_plan_id: '', source_id: '',
-    pipeline_status: 'lead_nuevo', notes: ''
+    pipeline_status: 'lead_nuevo', notes: '', lines_to_port: ''
   });
+  const [prospectPlans, setProspectPlans] = useState([]);
   const [saving, setSaving] = useState(false);
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
+
+  const prospectTotal = prospectPlans.reduce((sum, p) => sum + (parseFloat(p.plan_price) || 0), 0);
+
+  const addPlan = () => setProspectPlans(prev => [...prev, { plan_name: '', plan_price: '' }]);
+  const removePlan = (i) => setProspectPlans(prev => prev.filter((_, idx) => idx !== i));
+  const updatePlan = (i, field, val) => setProspectPlans(prev => prev.map((p, idx) => idx === i ? { ...p, [field]: val } : p));
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!form.full_name || !form.phone_primary) { toast.error('Nombre y teléfono son requeridos'); return; }
+    // Validate plans
+    for (let i = 0; i < prospectPlans.length; i++) {
+      if (!prospectPlans[i].plan_name?.trim()) { toast.error(`Plan ${i+1}: ingrese el nombre`); return; }
+      if (!prospectPlans[i].plan_price && prospectPlans[i].plan_price !== 0) { toast.error(`Plan ${i+1}: ingrese la tarifa`); return; }
+    }
     setSaving(true);
     try {
-      await api.post('/leads', form);
+      await api.post('/leads', { ...form, prospect_plans: prospectPlans });
       toast.success('Lead creado');
       onSave();
     } catch (err) { toast.error(err.message); }
@@ -164,6 +176,33 @@ function NewLeadModal({ operators, plans, sources, onClose, onSave }) {
             <option value="">Fuente del lead</option>
             {sources.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
           </select>
+
+          {/* Prospección */}
+          <div className="border-t pt-3">
+            <p className="text-sm font-semibold text-gray-700 mb-2">Prospección</p>
+            <input className="input-field" placeholder="Líneas a portar" type="number" min="0" value={form.lines_to_port}
+              onChange={e => set('lines_to_port', e.target.value)} />
+            <div className="flex items-center justify-between mt-2 mb-1">
+              <p className="text-xs text-gray-500">Planes prospectados</p>
+              <button type="button" onClick={addPlan} className="text-xs text-green-600 font-medium">+ Agregar</button>
+            </div>
+            {prospectPlans.map((pp, i) => (
+              <div key={i} className="flex items-center gap-2 mb-2">
+                <input className="input-field flex-1 text-sm" placeholder="Nombre plan" value={pp.plan_name}
+                  onChange={e => updatePlan(i, 'plan_name', e.target.value)} />
+                <input className="input-field w-24 text-sm" placeholder="$0.00" type="number" min="0" step="0.01"
+                  value={pp.plan_price} onChange={e => updatePlan(i, 'plan_price', e.target.value)} />
+                <button type="button" onClick={() => removePlan(i)} className="text-red-400 p-1">✕</button>
+              </div>
+            ))}
+            {prospectPlans.length > 0 && (
+              <div className="bg-gray-50 rounded-lg p-2 flex justify-between items-center">
+                <span className="text-xs text-gray-500">Total prospectado:</span>
+                <span className="text-sm font-bold text-claro-red">${prospectTotal.toFixed(2)}</span>
+              </div>
+            )}
+          </div>
+
           <textarea className="input-field" placeholder="Notas" rows={2} value={form.notes}
             onChange={e => set('notes', e.target.value)} />
           <button type="submit" disabled={saving} className="btn-primary w-full">
