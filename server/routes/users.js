@@ -104,6 +104,55 @@ router.put('/:id', requireRole('gerente'), (req, res) => {
   res.json({ message: 'Usuario actualizado' });
 });
 
+// Delete user
+router.delete('/:id', requireRole('gerente'), (req, res) => {
+  const userId = parseInt(req.params.id);
+
+  // Cannot delete yourself
+  if (userId === req.user.id) {
+    return res.status(400).json({ error: 'No puede eliminarse a sí mismo.' });
+  }
+
+  const user = db.prepare('SELECT id, full_name, username FROM users WHERE id = ?').get(userId);
+  if (!user) {
+    return res.status(404).json({ error: 'Usuario no encontrado.' });
+  }
+
+  // Check if user has leads assigned as vendor (NOT NULL constraint)
+  const leadsCount = db.prepare('SELECT COUNT(*) as count FROM leads WHERE vendor_id = ?').get(userId).count;
+  if (leadsCount > 0) {
+    return res.status(400).json({
+      error: `No se puede eliminar: el usuario tiene ${leadsCount} lead(s) asignado(s). Reasigne los leads primero.`
+    });
+  }
+
+  const deleteUser = db.transaction(() => {
+    // Remove supervisor reference from other users
+    db.prepare('UPDATE users SET supervisor_id = NULL WHERE supervisor_id = ?').run(userId);
+    // Remove supervisor reference from leads
+    db.prepare('UPDATE leads SET supervisor_id = NULL WHERE supervisor_id = ?').run(userId);
+    // Delete notifications
+    db.prepare('DELETE FROM notifications WHERE user_id = ?').run(userId);
+    // Delete activity log entries
+    db.prepare('DELETE FROM user_activity_log WHERE user_id = ?').run(userId);
+    // Delete lead activities by this user
+    db.prepare('DELETE FROM lead_activities WHERE user_id = ?').run(userId);
+    // Delete the user
+    db.prepare('DELETE FROM users WHERE id = ?').run(userId);
+  });
+
+  try {
+    deleteUser();
+    // Log the deletion
+    db.prepare('INSERT INTO user_activity_log (user_id, action, details) VALUES (?, ?, ?)')
+      .run(req.user.id, 'delete_user', `Deleted user: ${user.username} (${user.full_name})`);
+    res.json({ message: `Usuario "${user.full_name}" eliminado exitosamente.` });
+  } catch (e) {
+    console.error('Error deleting user:', e);
+    res.status(500).json({ error: 'Error al eliminar el usuario.' });
+  }
+});
+
 // Get user activity log
 router.get('/:id/activity', (req, res) => {
   const logs = db.prepare(

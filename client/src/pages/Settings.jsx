@@ -77,22 +77,31 @@ export default function Settings() {
   const [operators, setOperators] = useState([]);
   const [sources, setSources] = useState([]);
   const [reasons, setReasons] = useState([]);
+  const [users, setUsers] = useState([]);
   const [commConfig, setCommConfig] = useState({
     period_type: 'mensual', overcommission_threshold_pct: 120, overcommission_multiplier: 1.5
   });
   const [loading, setLoading] = useState(true);
+  const [deletingUser, setDeletingUser] = useState(null);
+
+  // Get current user from localStorage
+  const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
+  const isGerente = currentUser.role === 'gerente';
 
   const fetchAll = async () => {
     try {
-      const [p, o, s, r, c] = await Promise.all([
+      const promises = [
         api.get('/config/plans'),
         api.get('/config/operators'),
         api.get('/config/sources'),
         api.get('/config/rejection-reasons'),
         api.get('/commissions/config'),
-      ]);
-      setPlans(p); setOperators(o); setSources(s); setReasons(r);
-      if (c) setCommConfig(c);
+      ];
+      if (isGerente) promises.push(api.get('/users'));
+      const results = await Promise.all(promises);
+      setPlans(results[0]); setOperators(results[1]); setSources(results[2]); setReasons(results[3]);
+      if (results[4]) setCommConfig(results[4]);
+      if (isGerente && results[5]) setUsers(results[5]);
     } catch (e) { /* ignore */ }
     finally { setLoading(false); }
   };
@@ -210,6 +219,100 @@ export default function Settings() {
           </button>
         </div>
       </div>
+
+      {/* User Management - Delete */}
+      {isGerente && (
+        <div className="bg-white rounded-xl shadow-sm border">
+          <div className="flex items-center justify-between p-4 border-b">
+            <div>
+              <h3 className="font-semibold text-gray-700">Eliminar Usuarios</h3>
+              <p className="text-xs text-gray-400 mt-0.5">Solo usuarios sin leads asignados pueden ser eliminados</p>
+            </div>
+            <span className="px-2 py-1 bg-red-100 text-red-700 text-xs font-medium rounded-lg">Solo Gerente</span>
+          </div>
+          <div className="divide-y">
+            {users.filter(u => u.id !== currentUser.id).map(user => (
+              <div key={user.id} className="flex items-center justify-between p-3 hover:bg-gray-50">
+                <div className="flex items-center gap-3">
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold ${
+                    user.role === 'gerente' ? 'bg-purple-500' : user.role === 'supervisor' ? 'bg-blue-500' : 'bg-green-500'
+                  }`}>
+                    {user.full_name?.charAt(0)?.toUpperCase()}
+                  </div>
+                  <div>
+                    <span className="text-sm font-medium text-gray-800">{user.full_name}</span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-gray-400">@{user.username}</span>
+                      <span className={`text-xs px-1.5 py-0.5 rounded ${
+                        user.role === 'gerente' ? 'bg-purple-100 text-purple-700' :
+                        user.role === 'supervisor' ? 'bg-blue-100 text-blue-700' : 'bg-green-100 text-green-700'
+                      }`}>{user.role}</span>
+                      {!user.active && <span className="text-xs px-1.5 py-0.5 rounded bg-gray-200 text-gray-500">inactivo</span>}
+                    </div>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setDeletingUser(user)}
+                  className="px-3 py-1.5 text-xs text-red-600 border border-red-300 rounded-lg hover:bg-red-50 hover:border-red-400 transition-colors"
+                >
+                  Eliminar
+                </button>
+              </div>
+            ))}
+            {users.filter(u => u.id !== currentUser.id).length === 0 && (
+              <div className="p-4 text-center text-gray-500 text-sm">No hay otros usuarios para gestionar</div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {deletingUser && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center">
+                <svg className="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                </svg>
+              </div>
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900">Confirmar eliminación</h3>
+                <p className="text-sm text-gray-500">Esta acción no se puede deshacer</p>
+              </div>
+            </div>
+            <p className="text-sm text-gray-700 mb-1">
+              ¿Está seguro que desea eliminar al usuario <strong>{deletingUser.full_name}</strong>?
+            </p>
+            <p className="text-xs text-gray-400 mb-5">
+              Se eliminarán sus notificaciones, registros de actividad y referencias de supervisión.
+            </p>
+            <div className="flex gap-3 justify-end">
+              <button
+                onClick={() => setDeletingUser(null)}
+                className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={async () => {
+                  try {
+                    const res = await api.delete(`/users/${deletingUser.id}`);
+                    toast.success(res.message || 'Usuario eliminado');
+                    setDeletingUser(null);
+                    fetchAll();
+                  } catch (e) {
+                    toast.error(e.message || 'Error al eliminar usuario');
+                  }
+                }}
+                className="px-4 py-2 text-sm bg-red-600 text-white rounded-lg hover:bg-red-700"
+              >
+                Sí, eliminar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Backup */}
       <div className="bg-white rounded-xl shadow-sm border p-5">
