@@ -23,6 +23,7 @@ app.use('/api/commissions', require('./routes/commissions'));
 app.use('/api/config', require('./routes/config'));
 app.use('/api/reports', require('./routes/reports'));
 app.use('/api/notifications', require('./routes/notifications'));
+app.use('/api/imports', require('./routes/imports'));
 
 // Serve Mobile PWA app
 const mobileBuildPath = path.join(__dirname, '..', 'mobile', 'dist');

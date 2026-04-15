@@ -11,6 +11,7 @@ import Commissions from './pages/Commissions';
 import Reports from './pages/Reports';
 import Users from './pages/Users';
 import Settings from './pages/Settings';
+import Import from './pages/Import';
 
 function ProtectedRoute({ children }) {
   const { user, loading } = useAuth();
@@ -38,6 +39,7 @@ export default function App() {
           <Route path="reports" element={<Reports />} />
           <Route path="users" element={<Users />} />
           <Route path="settings" element={<Settings />} />
+          <Route path="importar" element={<Import />} />
         </Route>
       </Routes>
     </>

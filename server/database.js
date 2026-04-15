@@ -160,11 +160,36 @@ db.exec(`
     config_value TEXT NOT NULL,
     updated_at TEXT DEFAULT (datetime('now'))
   );
+
+  CREATE TABLE IF NOT EXISTS campaigns (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    active INTEGER DEFAULT 1,
+    created_at TEXT DEFAULT (datetime('now'))
+  );
+
+  CREATE TABLE IF NOT EXISTS import_history (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL REFERENCES users(id),
+    file_name TEXT NOT NULL,
+    campaign_id INTEGER REFERENCES campaigns(id),
+    total_records INTEGER DEFAULT 0,
+    new_records INTEGER DEFAULT 0,
+    replaced_records INTEGER DEFAULT 0,
+    merged_records INTEGER DEFAULT 0,
+    skipped_records INTEGER DEFAULT 0,
+    error_records INTEGER DEFAULT 0,
+    created_at TEXT DEFAULT (datetime('now'))
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_import_history_user ON import_history(user_id);
 `);
 
 // Migration: add new columns if they don't exist
 try { db.exec("ALTER TABLE leads ADD COLUMN lines_to_port INTEGER DEFAULT 0"); } catch(e) {}
 try { db.exec("ALTER TABLE leads ADD COLUMN prospect_total REAL DEFAULT 0"); } catch(e) {}
+try { db.exec("ALTER TABLE leads ADD COLUMN city TEXT"); } catch(e) {}
+try { db.exec("ALTER TABLE leads ADD COLUMN import_id INTEGER REFERENCES import_history(id)"); } catch(e) {}
 try { db.exec("ALTER TABLE users ADD COLUMN phone TEXT"); } catch(e) {}
 try { db.exec("ALTER TABLE users ADD COLUMN modified_by INTEGER"); } catch(e) {}
 try { db.exec("ALTER TABLE users ADD COLUMN modified_at TEXT"); } catch(e) {}

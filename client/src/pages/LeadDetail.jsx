@@ -97,6 +97,10 @@ export default function LeadDetail() {
               <div className="flex justify-between"><span className="text-gray-500">Plan ofrecido:</span><span>{lead.claro_plan_name || '—'}</span></div>
               <div className="flex justify-between"><span className="text-gray-500">Fuente:</span><span>{lead.source_name || '—'}</span></div>
               <div className="flex justify-between"><span className="text-gray-500">Creado:</span><span>{formatDate(lead.created_at)}</span></div>
+              {lead.city && <div className="flex justify-between"><span className="text-gray-500">Ciudad:</span><span>{lead.city}</span></div>}
+              {lead.import_file_name && (
+                <div className="flex justify-between"><span className="text-gray-500">Importado de:</span><span className="text-xs font-mono text-blue-600">{lead.import_file_name} ({formatDate(lead.import_date)})</span></div>
+              )}
               {lead.claro_request_number && <div className="flex justify-between"><span className="text-gray-500">N° Solicitud:</span><span className="font-mono">{lead.claro_request_number}</span></div>}
               {lead.activation_date && <div className="flex justify-between"><span className="text-gray-500">F. Activación:</span><span>{formatDate(lead.activation_date)}</span></div>}
             </div>

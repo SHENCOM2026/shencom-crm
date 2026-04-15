@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { api } from '../utils/api';
 import { PIPELINE_STATUSES, getStatusInfo, formatDate } from '../utils/constants';
@@ -264,6 +264,7 @@ function AssignModal({ isOpen, onClose, onAssign, vendors, count }) {
 export default function Leads() {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const fileInputRef = useRef(null);
   const [leads, setLeads] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -284,13 +285,15 @@ export default function Leads() {
       const params = new URLSearchParams();
       if (search) params.set('search', search);
       Object.entries(filters).forEach(([k, v]) => { if (v) params.set(k, v); });
+      const importId = searchParams.get('import_id');
+      if (importId) params.set('import_id', importId);
       const data = await api.get(`/leads?${params}`);
       setLeads(data);
     } catch (e) { toast.error('Error cargando leads'); }
     finally { setLoading(false); }
   };
 
-  useEffect(() => { fetchLeads(); }, [search, filters]);
+  useEffect(() => { fetchLeads(); }, [search, filters, searchParams]);
   useEffect(() => {
     Promise.all([
       api.get('/users/vendors').then(setVendors),
@@ -351,7 +354,15 @@ export default function Leads() {
   return (
     <div className="space-y-4">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <h1 className="text-2xl font-bold text-gray-900">Gestión de Leads</h1>
+        <div className="flex items-center gap-3">
+          <h1 className="text-2xl font-bold text-gray-900">Gestión de Leads</h1>
+          {searchParams.get('import_id') && (
+            <span className="px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-xs font-medium">
+              Filtrado por importación #{searchParams.get('import_id')}
+              <button onClick={() => navigate('/leads')} className="ml-2 text-blue-500 hover:text-blue-800">&times;</button>
+            </span>
+          )}
+        </div>
         <div className="flex flex-wrap gap-2">
           <button onClick={() => { setEditingLead(null); setShowModal(true); }}
             className="flex items-center gap-1.5 px-3 py-1.5 bg-claro-red text-white rounded-lg text-sm hover:bg-claro-red-dark">

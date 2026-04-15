@@ -94,6 +94,27 @@ router.delete('/rejection-reasons/:id', requireRole('gerente'), (req, res) => {
   res.json({ message: 'Motivo eliminado' });
 });
 
+// --- Campaigns ---
+router.get('/campaigns', (req, res) => {
+  res.json(db.prepare('SELECT * FROM campaigns ORDER BY name').all());
+});
+
+router.post('/campaigns', requireRole('gerente'), (req, res) => {
+  const result = db.prepare('INSERT INTO campaigns (name) VALUES (?)').run(req.body.name);
+  res.status(201).json({ id: result.lastInsertRowid });
+});
+
+router.put('/campaigns/:id', requireRole('gerente'), (req, res) => {
+  db.prepare('UPDATE campaigns SET name = ?, active = ? WHERE id = ?')
+    .run(req.body.name, req.body.active !== undefined ? req.body.active : 1, req.params.id);
+  res.json({ message: 'Campaña actualizada' });
+});
+
+router.delete('/campaigns/:id', requireRole('gerente'), (req, res) => {
+  db.prepare('DELETE FROM campaigns WHERE id = ?').run(req.params.id);
+  res.json({ message: 'Campaña eliminada' });
+});
+
 // --- WhatsApp Config ---
 router.get('/whatsapp', (req, res) => {
   const rows = db.prepare("SELECT config_key, config_value FROM app_config WHERE config_key LIKE 'whatsapp_%'").all();

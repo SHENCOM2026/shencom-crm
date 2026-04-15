@@ -77,6 +77,7 @@ export default function Settings() {
   const [operators, setOperators] = useState([]);
   const [sources, setSources] = useState([]);
   const [reasons, setReasons] = useState([]);
+  const [campaigns, setCampaigns] = useState([]);
   const [users, setUsers] = useState([]);
   const [commConfig, setCommConfig] = useState({
     period_type: 'mensual', overcommission_threshold_pct: 120, overcommission_multiplier: 1.5
@@ -98,15 +99,17 @@ export default function Settings() {
         api.get('/config/operators'),
         api.get('/config/sources'),
         api.get('/config/rejection-reasons'),
+        api.get('/config/campaigns'),
         api.get('/commissions/config'),
         api.get('/config/whatsapp'),
       ];
       if (isGerente) promises.push(api.get('/users'));
       const results = await Promise.all(promises);
       setPlans(results[0]); setOperators(results[1]); setSources(results[2]); setReasons(results[3]);
-      if (results[4]) setCommConfig(results[4]);
-      if (results[5]) setWaConfig(prev => ({ ...prev, ...results[5] }));
-      if (isGerente && results[6]) setUsers(results[6]);
+      setCampaigns(results[4] || []);
+      if (results[5]) setCommConfig(results[5]);
+      if (results[6]) setWaConfig(prev => ({ ...prev, ...results[6] }));
+      if (isGerente && results[7]) setUsers(results[7]);
     } catch (e) { /* ignore */ }
     finally { setLoading(false); }
   };
@@ -144,6 +147,14 @@ export default function Settings() {
     toast.success('Guardado'); fetchAll();
   };
   const handleReasonDelete = async (id) => { await api.delete(`/config/rejection-reasons/${id}`); toast.success('Eliminado'); fetchAll(); };
+
+  // Campaigns
+  const handleCampSave = async (form, editId) => {
+    if (editId) await api.put(`/config/campaigns/${editId}`, form);
+    else await api.post('/config/campaigns', form);
+    toast.success('Guardado'); fetchAll();
+  };
+  const handleCampDelete = async (id) => { await api.delete(`/config/campaigns/${id}`); toast.success('Eliminado'); fetchAll(); };
 
   const handleCommConfigSave = async () => {
     try {
@@ -184,6 +195,10 @@ export default function Settings() {
       <CRUDSection title="Motivos de Rechazo" items={reasons}
         fields={[{ key: 'name', label: 'Nombre', default: '' }]}
         onSave={handleReasonSave} onDelete={handleReasonDelete} />
+
+      <CRUDSection title="Campañas de Importación" items={campaigns}
+        fields={[{ key: 'name', label: 'Nombre', default: '' }]}
+        onSave={handleCampSave} onDelete={handleCampDelete} />
 
       {/* WhatsApp Config */}
       {isGerente && (

@@ -61,6 +61,10 @@ function buildLeadFilter(req) {
     conditions.push('l.prospect_total <= ?');
     params.push(parseFloat(req.query.value_max));
   }
+  if (req.query.import_id) {
+    conditions.push('l.import_id = ?');
+    params.push(parseInt(req.query.import_id));
+  }
 
   return { where: conditions.length ? 'WHERE ' + conditions.join(' AND ') : '', params };
 }
@@ -90,13 +94,15 @@ router.get('/', (req, res) => {
 router.get('/:id', (req, res) => {
   const lead = db.prepare(`
     SELECT l.*, v.full_name as vendor_name, s.full_name as supervisor_name,
-      o.name as operator_name, ls.name as source_name, cp.name as claro_plan_name
+      o.name as operator_name, ls.name as source_name, cp.name as claro_plan_name,
+      ih.file_name as import_file_name, ih.created_at as import_date
     FROM leads l
     LEFT JOIN users v ON l.vendor_id = v.id
     LEFT JOIN users s ON l.supervisor_id = s.id
     LEFT JOIN origin_operators o ON l.operator_origin_id = o.id
     LEFT JOIN lead_sources ls ON l.source_id = ls.id
     LEFT JOIN claro_plans cp ON l.claro_plan_id = cp.id
+    LEFT JOIN import_history ih ON l.import_id = ih.id
     WHERE l.id = ?
   `).get(req.params.id);
 
