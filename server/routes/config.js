@@ -94,6 +94,27 @@ router.delete('/rejection-reasons/:id', requireRole('gerente'), (req, res) => {
   res.json({ message: 'Motivo eliminado' });
 });
 
+// --- WhatsApp Config ---
+router.get('/whatsapp', (req, res) => {
+  const rows = db.prepare("SELECT config_key, config_value FROM app_config WHERE config_key LIKE 'whatsapp_%'").all();
+  const config = {};
+  rows.forEach(r => {
+    const key = r.config_key.replace('whatsapp_', '');
+    config[key] = r.config_value;
+  });
+  res.json(config);
+});
+
+router.put('/whatsapp', requireRole('gerente'), (req, res) => {
+  const { country_code, message_template } = req.body;
+  const upsert = db.prepare(
+    "INSERT INTO app_config (config_key, config_value, updated_at) VALUES (?, ?, datetime('now')) ON CONFLICT(config_key) DO UPDATE SET config_value = excluded.config_value, updated_at = excluded.updated_at"
+  );
+  if (country_code !== undefined) upsert.run('whatsapp_country_code', country_code.toString().trim());
+  if (message_template !== undefined) upsert.run('whatsapp_message_template', message_template.trim());
+  res.json({ message: 'Configuración de WhatsApp guardada' });
+});
+
 // --- Database Backup ---
 router.get('/backup', requireRole('gerente'), (req, res) => {
   const dbPath = db.dbPath || path.join(__dirname, '..', '..', 'shencom.db');

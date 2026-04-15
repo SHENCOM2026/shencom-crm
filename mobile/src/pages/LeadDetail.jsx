@@ -12,8 +12,16 @@ export default function LeadDetail() {
   const [tab, setTab] = useState('info');
   const [showActivity, setShowActivity] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [waConfig, setWaConfig] = useState({ country_code: '593', message_template: 'Hola {nombre}, le saluda un asesor de Claro Ecuador.' });
 
-  useEffect(() => { loadLead(); }, [id]);
+  useEffect(() => { loadLead(); fetchWaConfig(); }, [id]);
+
+  const fetchWaConfig = async () => {
+    try {
+      const cfg = await api.get('/config/whatsapp');
+      if (cfg) setWaConfig(prev => ({ ...prev, ...cfg }));
+    } catch (e) { /* use defaults */ }
+  };
 
   const loadLead = async () => {
     try {
@@ -60,7 +68,11 @@ export default function LeadDetail() {
         {/* Quick actions */}
         <div className="flex gap-2 mt-3">
           <a href={`tel:${phone}`} className="flex-1 btn-primary text-center text-sm py-2 rounded-xl">📞 Llamar</a>
-          <a href={`https://wa.me/593${phone?.slice(-9)}`} target="_blank" rel="noreferrer"
+          <a href={`https://wa.me/${waConfig.country_code}${phone?.slice(-9)}?text=${encodeURIComponent(
+              waConfig.message_template
+                .replace('{nombre}', lead.full_name || '')
+                .replace('{vendedor}', JSON.parse(localStorage.getItem('user') || '{}').full_name || 'un asesor')
+            )}`} target="_blank" rel="noreferrer"
             className="flex-1 bg-green-500 text-white text-center text-sm py-2 rounded-xl font-medium">💬 WhatsApp</a>
         </div>
       </div>

@@ -14,8 +14,16 @@ export default function LeadDetail() {
     activity_type: 'llamada_saliente', duration_minutes: '', result: 'contacto_efectivo',
     notes: '', next_action: '', next_action_date: ''
   });
+  const [waConfig, setWaConfig] = useState({ country_code: '593', message_template: 'Hola {nombre}, le saluda un asesor de Claro Ecuador.' });
 
-  useEffect(() => { fetchLead(); }, [id]);
+  useEffect(() => { fetchLead(); fetchWaConfig(); }, [id]);
+
+  const fetchWaConfig = async () => {
+    try {
+      const cfg = await api.get('/config/whatsapp');
+      if (cfg) setWaConfig(prev => ({ ...prev, ...cfg }));
+    } catch (e) { /* use defaults */ }
+  };
 
   const fetchLead = async () => {
     try {
@@ -71,7 +79,11 @@ export default function LeadDetail() {
                 className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-blue-50 text-blue-700 rounded-lg text-sm font-medium hover:bg-blue-100">
                 📞 Llamar
               </a>
-              <a href={`https://wa.me/593${lead.phone_primary?.replace(/\D/g, '').slice(-9)}?text=${encodeURIComponent(`Hola ${lead.full_name}, le saluda un asesor de Claro Ecuador.`)}`}
+              <a href={`https://wa.me/${waConfig.country_code}${lead.phone_primary?.replace(/\D/g, '').slice(-9)}?text=${encodeURIComponent(
+                  waConfig.message_template
+                    .replace('{nombre}', lead.full_name || '')
+                    .replace('{vendedor}', JSON.parse(localStorage.getItem('user') || '{}').full_name || 'un asesor')
+                )}`}
                 target="_blank" rel="noreferrer"
                 className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-green-50 text-green-700 rounded-lg text-sm font-medium hover:bg-green-100">
                 💬 WhatsApp

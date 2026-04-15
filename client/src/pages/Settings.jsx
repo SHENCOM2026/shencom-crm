@@ -81,6 +81,9 @@ export default function Settings() {
   const [commConfig, setCommConfig] = useState({
     period_type: 'mensual', overcommission_threshold_pct: 120, overcommission_multiplier: 1.5
   });
+  const [waConfig, setWaConfig] = useState({
+    country_code: '593', message_template: 'Hola {nombre}, le saluda {vendedor} de Claro Ecuador.'
+  });
   const [loading, setLoading] = useState(true);
   const [deletingUser, setDeletingUser] = useState(null);
 
@@ -96,12 +99,14 @@ export default function Settings() {
         api.get('/config/sources'),
         api.get('/config/rejection-reasons'),
         api.get('/commissions/config'),
+        api.get('/config/whatsapp'),
       ];
       if (isGerente) promises.push(api.get('/users'));
       const results = await Promise.all(promises);
       setPlans(results[0]); setOperators(results[1]); setSources(results[2]); setReasons(results[3]);
       if (results[4]) setCommConfig(results[4]);
-      if (isGerente && results[5]) setUsers(results[5]);
+      if (results[5]) setWaConfig(prev => ({ ...prev, ...results[5] }));
+      if (isGerente && results[6]) setUsers(results[6]);
     } catch (e) { /* ignore */ }
     finally { setLoading(false); }
   };
@@ -179,6 +184,54 @@ export default function Settings() {
       <CRUDSection title="Motivos de Rechazo" items={reasons}
         fields={[{ key: 'name', label: 'Nombre', default: '' }]}
         onSave={handleReasonSave} onDelete={handleReasonDelete} />
+
+      {/* WhatsApp Config */}
+      {isGerente && (
+        <div className="bg-white rounded-xl shadow-sm border p-5">
+          <h3 className="font-semibold text-gray-700 mb-4">💬 Configuración de WhatsApp</h3>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Código de país</label>
+              <div className="flex items-center gap-2">
+                <span className="text-gray-500 text-sm">+</span>
+                <input type="text" value={waConfig.country_code}
+                  onChange={e => setWaConfig(c => ({ ...c, country_code: e.target.value.replace(/\D/g, '') }))}
+                  placeholder="593"
+                  className="w-32 px-3 py-2 border rounded-lg focus:ring-2 focus:ring-claro-red outline-none" />
+              </div>
+              <p className="text-xs text-gray-400 mt-1">Ej: 593 (Ecuador), 57 (Colombia), 51 (Perú)</p>
+            </div>
+            <div className="sm:col-span-1">
+              <label className="block text-sm font-medium text-gray-700 mb-1">Plantilla de mensaje</label>
+              <textarea value={waConfig.message_template}
+                onChange={e => setWaConfig(c => ({ ...c, message_template: e.target.value }))}
+                rows={3}
+                className="w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-claro-red outline-none" />
+              <p className="text-xs text-gray-400 mt-1">
+                Variables disponibles: <code className="bg-gray-100 px-1 rounded">{'{nombre}'}</code> = nombre del lead, <code className="bg-gray-100 px-1 rounded">{'{vendedor}'}</code> = nombre del vendedor
+              </p>
+            </div>
+          </div>
+          <div className="mt-3 p-3 bg-green-50 rounded-lg">
+            <p className="text-xs text-green-700 font-medium mb-1">Vista previa:</p>
+            <p className="text-sm text-green-800">
+              {waConfig.message_template
+                .replace('{nombre}', 'Juan Pérez')
+                .replace('{vendedor}', currentUser.full_name || 'Asesor')}
+            </p>
+          </div>
+          <div className="mt-4">
+            <button onClick={async () => {
+              try {
+                await api.put('/config/whatsapp', waConfig);
+                toast.success('Configuración de WhatsApp guardada');
+              } catch (e) { toast.error('Error al guardar'); }
+            }} className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm hover:bg-green-700">
+              Guardar WhatsApp
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Commission Config */}
       <div className="bg-white rounded-xl shadow-sm border p-5">

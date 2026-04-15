@@ -154,6 +154,12 @@ db.exec(`
     created_at TEXT DEFAULT (datetime('now'))
   );
   CREATE INDEX IF NOT EXISTS idx_change_log_lead ON lead_change_log(lead_id);
+
+  CREATE TABLE IF NOT EXISTS app_config (
+    config_key TEXT PRIMARY KEY,
+    config_value TEXT NOT NULL,
+    updated_at TEXT DEFAULT (datetime('now'))
+  );
 `);
 
 // Migration: add new columns if they don't exist
@@ -162,5 +168,10 @@ try { db.exec("ALTER TABLE leads ADD COLUMN prospect_total REAL DEFAULT 0"); } c
 try { db.exec("ALTER TABLE users ADD COLUMN phone TEXT"); } catch(e) {}
 try { db.exec("ALTER TABLE users ADD COLUMN modified_by INTEGER"); } catch(e) {}
 try { db.exec("ALTER TABLE users ADD COLUMN modified_at TEXT"); } catch(e) {}
+
+// Seed default WhatsApp config if not exists
+const insertDefault = db.prepare('INSERT OR IGNORE INTO app_config (config_key, config_value) VALUES (?, ?)');
+insertDefault.run('whatsapp_country_code', '593');
+insertDefault.run('whatsapp_message_template', 'Hola {nombre}, le saluda {vendedor} de Claro Ecuador.');
 
 module.exports = db;
