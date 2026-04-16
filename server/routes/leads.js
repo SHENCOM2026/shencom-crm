@@ -463,6 +463,7 @@ router.get('/export/csv', (req, res) => {
       l.phone_secondary as Telefono_Secundario, l.email as Email,
       o.name as Operador_Origen, l.current_plan as Plan_Actual,
       cp.name as Plan_Claro, v.full_name as Vendedor,
+      CASE WHEN l.prospect_total > 0 THEN ROUND(l.prospect_total, 2) ELSE NULL END as "Valor ($)",
       l.pipeline_status as Estado, l.created_at as Fecha_Creacion,
       l.claro_request_number as Numero_Solicitud, l.activation_date as Fecha_Activacion
     FROM leads l

@@ -4,10 +4,8 @@ import { api } from '../utils/api';
 import { PIPELINE_STATUSES, getStatusInfo, formatDate } from '../utils/constants';
 import toast from 'react-hot-toast';
 import {
-  DndContext, closestCenter, PointerSensor, useSensor, useSensors, DragOverlay
+  DndContext, PointerSensor, useSensor, useSensors, DragOverlay, useDroppable, useDraggable, rectIntersection
 } from '@dnd-kit/core';
-import { useSortable } from '@dnd-kit/sortable';
-import { CSS } from '@dnd-kit/utilities';
 
 /* ───── Modal for Solicitud Enviada / Portabilidad Exitosa ───── */
 function StatusModal({ isOpen, onClose, onSubmit, targetStatus }) {
@@ -76,14 +74,15 @@ function StatusModal({ isOpen, onClose, onSubmit, targetStatus }) {
 
 /* ───── Draggable Lead Card ───── */
 function LeadCard({ lead }) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: String(lead.id),
     data: { status: lead.pipeline_status }
   });
   const style = {
-    transform: CSS.Transform.toString(transform),
-    transition,
+    transform: transform ? `translate(${transform.x}px, ${transform.y}px)` : undefined,
     opacity: isDragging ? 0.4 : 1,
+    zIndex: isDragging ? 999 : undefined,
+    position: isDragging ? 'relative' : undefined,
   };
 
   return (
@@ -116,8 +115,9 @@ function LeadCard({ lead }) {
 /* ───── Droppable Column ───── */
 function Column({ status, leads }) {
   const info = getStatusInfo(status);
+  const { setNodeRef, isOver } = useDroppable({ id: status });
   return (
-    <div className="flex-shrink-0 w-72 bg-gray-50 rounded-xl border border-gray-200 flex flex-col" style={{ maxHeight: 'calc(100vh - 220px)' }}>
+    <div className={`flex-shrink-0 w-72 rounded-xl border flex flex-col transition-colors ${isOver ? 'bg-blue-50 border-blue-300 ring-2 ring-blue-200' : 'bg-gray-50 border-gray-200'}`} style={{ maxHeight: 'calc(100vh - 220px)' }}>
       <div className="p-3 border-b bg-white rounded-t-xl flex-shrink-0">
         <div className="flex items-center gap-2">
           <div className={`w-3 h-3 rounded-full ${info.dotColor}`} />
@@ -125,7 +125,7 @@ function Column({ status, leads }) {
           <span className="ml-auto bg-gray-200 text-gray-600 text-xs font-semibold px-2 py-0.5 rounded-full">{leads.length}</span>
         </div>
       </div>
-      <div className="p-2 overflow-y-auto flex-1" data-status={status}>
+      <div ref={setNodeRef} className="p-2 overflow-y-auto flex-1" style={{ minHeight: 100 }}>
         {leads.map(lead => <LeadCard key={lead.id} lead={lead} />)}
         {leads.length === 0 && <div className="text-center text-gray-400 text-sm py-8">Sin leads</div>}
       </div>
@@ -168,19 +168,12 @@ export default function Pipeline() {
     const { active, over } = event;
     if (!over) return;
 
-    // Determine target column from the over element
     const leadId = parseInt(active.id);
     const currentLead = leads.find(l => l.id === leadId);
     if (!currentLead) return;
 
-    // over.id could be another lead id or a column identifier
-    let targetStatus;
-    const overLead = leads.find(l => String(l.id) === over.id);
-    if (overLead) {
-      targetStatus = overLead.pipeline_status;
-    } else {
-      targetStatus = over.id; // It's a column id
-    }
+    // over.id is always a column status key (since only columns are droppable now)
+    const targetStatus = over.id;
 
     if (!targetStatus || targetStatus === currentLead.pipeline_status) return;
 
@@ -190,11 +183,17 @@ export default function Pipeline() {
       return;
     }
 
+    // Optimistic update
+    const previousStatus = currentLead.pipeline_status;
+    setLeads(prev => prev.map(l => l.id === leadId ? { ...l, pipeline_status: targetStatus } : l));
     try {
       await api.patch(`/leads/${leadId}/status`, { pipeline_status: targetStatus });
-      setLeads(prev => prev.map(l => l.id === leadId ? { ...l, pipeline_status: targetStatus } : l));
       toast.success(`Movido a "${getStatusInfo(targetStatus).label}"`);
-    } catch (e) { toast.error('Error al mover lead'); }
+    } catch (e) {
+      // Rollback on failure
+      setLeads(prev => prev.map(l => l.id === leadId ? { ...l, pipeline_status: previousStatus } : l));
+      toast.error('Error al mover lead');
+    }
   };
 
   const handleModalSubmit = async (data) => {
@@ -234,7 +233,7 @@ export default function Pipeline() {
         onSubmit={handleModalSubmit} targetStatus={modal.targetStatus} />
 
       {view === 'kanban' ? (
-        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+        <DndContext sensors={sensors} collisionDetection={rectIntersection} onDragEnd={handleDragEnd}>
           <div className="flex gap-3 overflow-x-auto pb-4">
             {PIPELINE_STATUSES.map(s => (
               <Column key={s.key} status={s.key} leads={leads.filter(l => l.pipeline_status === s.key)} />

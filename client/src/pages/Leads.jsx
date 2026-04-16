@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { api } from '../utils/api';
@@ -279,6 +279,8 @@ export default function Leads() {
   const [sources, setSources] = useState([]);
   const [search, setSearch] = useState('');
   const [filters, setFilters] = useState({ status: '', vendor_id: '', operator_id: '', source_id: '', date_from: '', date_to: '', value_min: '', value_max: '' });
+  const [valorSort, setValorSort] = useState(null); // null | 'asc' | 'desc'
+  const [showValorMenu, setShowValorMenu] = useState(false);
 
   const fetchLeads = async () => {
     try {
@@ -303,6 +305,20 @@ export default function Leads() {
       api.get('/config/sources').then(setSources),
     ]).catch(() => {});
   }, []);
+
+  const sortedLeads = useMemo(() => {
+    if (!valorSort) return leads;
+    return [...leads].sort((a, b) => {
+      const aVal = parseFloat(a.prospect_total) || 0;
+      const bVal = parseFloat(b.prospect_total) || 0;
+      const aNull = !a.prospect_total || a.prospect_total === 0;
+      const bNull = !b.prospect_total || b.prospect_total === 0;
+      if (aNull && bNull) return 0;
+      if (aNull) return 1;
+      if (bNull) return -1;
+      return valorSort === 'asc' ? aVal - bVal : bVal - aVal;
+    });
+  }, [leads, valorSort]);
 
   const handleDelete = async (id) => {
     if (!confirm('¿Eliminar este lead?')) return;
@@ -441,13 +457,49 @@ export default function Leads() {
                 <th className="px-4 py-3 text-left font-semibold text-gray-600">Fuente</th>
                 <th className="px-4 py-3 text-left font-semibold text-gray-600">Estado</th>
                 <th className="px-4 py-3 text-left font-semibold text-gray-600">Vendedor</th>
-                <th className="px-4 py-3 text-right font-semibold text-gray-600">Valor USD</th>
+                <th className="px-4 py-3 text-right font-semibold text-gray-600 relative">
+                  <button onClick={() => setShowValorMenu(v => !v)}
+                    className={`inline-flex items-center gap-1 hover:text-claro-red transition-colors ${valorSort ? 'text-claro-red' : ''}`}>
+                    Valor ($)
+                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
+                    </svg>
+                    {valorSort === 'desc' && <span className="text-xs">↓</span>}
+                    {valorSort === 'asc' && <span className="text-xs">↑</span>}
+                  </button>
+                  {showValorMenu && (
+                    <>
+                      <div className="fixed inset-0 z-40" onClick={() => setShowValorMenu(false)} />
+                      <div className="absolute right-0 top-full mt-1 z-50 bg-white border border-gray-200 rounded-lg shadow-lg py-1 w-52">
+                        <button onClick={() => { setValorSort('desc'); setShowValorMenu(false); }}
+                          className={`w-full text-left px-3 py-2 text-sm flex items-center gap-2 hover:bg-gray-50 ${valorSort === 'desc' ? 'bg-red-50 text-claro-red font-medium' : 'text-gray-700'}`}>
+                          <span>↓</span> Mayor a menor
+                          {valorSort === 'desc' && <span className="ml-auto text-claro-red">✓</span>}
+                        </button>
+                        <button onClick={() => { setValorSort('asc'); setShowValorMenu(false); }}
+                          className={`w-full text-left px-3 py-2 text-sm flex items-center gap-2 hover:bg-gray-50 ${valorSort === 'asc' ? 'bg-red-50 text-claro-red font-medium' : 'text-gray-700'}`}>
+                          <span>↑</span> Menor a mayor
+                          {valorSort === 'asc' && <span className="ml-auto text-claro-red">✓</span>}
+                        </button>
+                        {valorSort && (
+                          <>
+                            <div className="border-t border-gray-100 my-1" />
+                            <button onClick={() => { setValorSort(null); setShowValorMenu(false); }}
+                              className="w-full text-left px-3 py-2 text-sm flex items-center gap-2 hover:bg-gray-50 text-gray-500">
+                              <span>✕</span> Quitar ordenamiento
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    </>
+                  )}
+                </th>
                 <th className="px-4 py-3 text-left font-semibold text-gray-600">Creado</th>
                 <th className="px-4 py-3 text-right font-semibold text-gray-600">Acciones</th>
               </tr>
             </thead>
             <tbody className="divide-y">
-              {leads.map(lead => {
+              {sortedLeads.map(lead => {
                 const info = getStatusInfo(lead.pipeline_status);
                 return (
                   <tr key={lead.id} className="hover:bg-gray-50 cursor-pointer" onClick={() => navigate(`/leads/${lead.id}`)}>
