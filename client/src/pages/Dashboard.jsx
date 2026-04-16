@@ -128,16 +128,15 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [vendorFilter, setVendorFilter] = useState('');
   const [vendors, setVendors] = useState([]);
-
-  if (user?.role === 'vendedor') return <VendorDashboard />;
-
-  useEffect(() => {
-    api.get('/users/vendors').then(setVendors).catch(() => {});
-  }, []);
+  const isVendedor = user?.role === 'vendedor';
 
   useEffect(() => {
-    fetchAll();
-  }, [vendorFilter]);
+    if (!isVendedor) api.get('/users/vendors').then(setVendors).catch(() => {});
+  }, [isVendedor]);
+
+  useEffect(() => {
+    if (!isVendedor) fetchAll();
+  }, [vendorFilter, isVendedor]);
 
   const fetchAll = async () => {
     try {
@@ -169,6 +168,8 @@ export default function Dashboard() {
       setLoading(false);
     }
   };
+
+  if (isVendedor) return <VendorDashboard />;
 
   if (loading) return <div className="flex items-center justify-center h-64"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-claro-red"></div></div>;
 
