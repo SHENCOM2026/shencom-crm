@@ -278,8 +278,9 @@ export default function Leads() {
   const [operators, setOperators] = useState([]);
   const [sources, setSources] = useState([]);
   const [search, setSearch] = useState('');
-  const [filters, setFilters] = useState({ status: [], vendor_id: '', operator_id: '', source_id: '', date_from: '', date_to: '', value_min: '', value_max: '' });
+  const [filters, setFilters] = useState({ status: [], vendor_id: [], operator_id: '', source_id: '', date_from: '', date_to: '', value_min: '', value_max: '' });
   const [showStatusMenu, setShowStatusMenu] = useState(false);
+  const [showVendorMenu, setShowVendorMenu] = useState(false);
   const [valorSort, setValorSort] = useState(null); // null | 'asc' | 'desc'
   const [showValorMenu, setShowValorMenu] = useState(false);
 
@@ -306,6 +307,12 @@ export default function Leads() {
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
   }, [showStatusMenu]);
+  useEffect(() => {
+    if (!showVendorMenu) return;
+    const handler = (e) => { if (!e.target.closest('.vendor-menu-wrap')) setShowVendorMenu(false); };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [showVendorMenu]);
   useEffect(() => {
     Promise.all([
       api.get('/users/vendors').then(setVendors),
@@ -466,11 +473,46 @@ export default function Leads() {
             {sources.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
           </select>
           {user?.role !== 'vendedor' && (
-            <select value={filters.vendor_id} onChange={e => setFilters(f => ({ ...f, vendor_id: e.target.value }))}
-              className="text-sm border rounded-lg px-3 py-2">
-              <option value="">Todos los vendedores</option>
-              {vendors.map(v => <option key={v.id} value={v.id}>{v.full_name}</option>)}
-            </select>
+            <div className="relative vendor-menu-wrap">
+              <button
+                onClick={() => setShowVendorMenu(p => !p)}
+                className={`text-sm border rounded-lg px-3 py-2 flex items-center gap-2 bg-white hover:bg-gray-50 ${filters.vendor_id.length > 0 ? 'border-claro-red text-claro-red' : 'text-gray-700'}`}
+              >
+                {filters.vendor_id.length === 0
+                  ? 'Todos los vendedores'
+                  : filters.vendor_id.length === 1
+                    ? vendors.find(v => String(v.id) === String(filters.vendor_id[0]))?.full_name
+                    : `${filters.vendor_id.length} vendedores`}
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+              </button>
+              {showVendorMenu && (
+                <div className="absolute z-30 mt-1 bg-white border rounded-xl shadow-lg min-w-[200px]">
+                  <div className="p-2 border-b flex items-center justify-between">
+                    <span className="text-xs font-medium text-gray-500">Filtrar por vendedor</span>
+                    {filters.vendor_id.length > 0 && (
+                      <button onClick={() => setFilters(f => ({ ...f, vendor_id: [] }))} className="text-xs text-claro-red hover:underline">Limpiar</button>
+                    )}
+                  </div>
+                  <div className="py-1 max-h-64 overflow-y-auto">
+                    {vendors.map(v => {
+                      const checked = filters.vendor_id.includes(String(v.id));
+                      return (
+                        <label key={v.id} className="flex items-center gap-2.5 px-3 py-2 hover:bg-gray-50 cursor-pointer">
+                          <input type="checkbox" checked={checked}
+                            onChange={() => setFilters(f => ({
+                              ...f,
+                              vendor_id: checked ? f.vendor_id.filter(x => x !== String(v.id)) : [...f.vendor_id, String(v.id)]
+                            }))}
+                            className="rounded accent-claro-red" />
+                          <span className="text-sm text-gray-700">{v.full_name}</span>
+                        </label>
+                      );
+                    })}
+                    {vendors.length === 0 && <div className="px-3 py-2 text-sm text-gray-400">Sin vendedores</div>}
+                  </div>
+                </div>
+              )}
+            </div>
           )}
           <input type="date" value={filters.date_from} onChange={e => setFilters(f => ({ ...f, date_from: e.target.value }))}
             className="text-sm border rounded-lg px-3 py-2" />

@@ -35,8 +35,14 @@ function buildLeadFilter(req) {
     }
   }
   if (req.query.vendor_id) {
-    conditions.push('l.vendor_id = ?');
-    params.push(req.query.vendor_id);
+    const vids = req.query.vendor_id.split(',').filter(Boolean);
+    if (vids.length === 1) {
+      conditions.push('l.vendor_id = ?');
+      params.push(vids[0]);
+    } else if (vids.length > 1) {
+      conditions.push(`l.vendor_id IN (${vids.map(() => '?').join(',')})`);
+      params.push(...vids);
+    }
   }
   if (req.query.operator_id) {
     conditions.push('l.operator_origin_id = ?');
