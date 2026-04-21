@@ -278,7 +278,8 @@ export default function Leads() {
   const [operators, setOperators] = useState([]);
   const [sources, setSources] = useState([]);
   const [search, setSearch] = useState('');
-  const [filters, setFilters] = useState({ status: '', vendor_id: '', operator_id: '', source_id: '', date_from: '', date_to: '', value_min: '', value_max: '' });
+  const [filters, setFilters] = useState({ status: [], vendor_id: '', operator_id: '', source_id: '', date_from: '', date_to: '', value_min: '', value_max: '' });
+  const [showStatusMenu, setShowStatusMenu] = useState(false);
   const [valorSort, setValorSort] = useState(null); // null | 'asc' | 'desc'
   const [showValorMenu, setShowValorMenu] = useState(false);
 
@@ -286,7 +287,10 @@ export default function Leads() {
     try {
       const params = new URLSearchParams();
       if (search) params.set('search', search);
-      Object.entries(filters).forEach(([k, v]) => { if (v) params.set(k, v); });
+      Object.entries(filters).forEach(([k, v]) => {
+        if (Array.isArray(v)) { if (v.length > 0) params.set(k, v.join(',')); }
+        else if (v) params.set(k, v);
+      });
       const importId = searchParams.get('import_id');
       if (importId) params.set('import_id', importId);
       const data = await api.get(`/leads?${params}`);
@@ -296,6 +300,12 @@ export default function Leads() {
   };
 
   useEffect(() => { fetchLeads(); }, [search, filters, searchParams]);
+  useEffect(() => {
+    if (!showStatusMenu) return;
+    const handler = (e) => { if (!e.target.closest('.status-menu-wrap')) setShowStatusMenu(false); };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [showStatusMenu]);
   useEffect(() => {
     Promise.all([
       api.get('/users/vendors').then(setVendors),
@@ -406,11 +416,45 @@ export default function Leads() {
           <input type="text" placeholder="Buscar nombre, cédula, teléfono..."
             value={search} onChange={e => setSearch(e.target.value)}
             className="flex-1 min-w-[200px] px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-claro-red outline-none" />
-          <select value={filters.status} onChange={e => setFilters(f => ({ ...f, status: e.target.value }))}
-            className="text-sm border rounded-lg px-3 py-2">
-            <option value="">Todos los estados</option>
-            {PIPELINE_STATUSES.map(s => <option key={s.key} value={s.key}>{s.label}</option>)}
-          </select>
+          <div className="relative status-menu-wrap">
+            <button
+              onClick={() => setShowStatusMenu(p => !p)}
+              className={`text-sm border rounded-lg px-3 py-2 flex items-center gap-2 bg-white hover:bg-gray-50 ${filters.status.length > 0 ? 'border-claro-red text-claro-red' : 'text-gray-700'}`}
+            >
+              {filters.status.length === 0
+                ? 'Todos los estados'
+                : filters.status.length === 1
+                  ? PIPELINE_STATUSES.find(s => s.key === filters.status[0])?.label
+                  : `${filters.status.length} estados`}
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+            </button>
+            {showStatusMenu && (
+              <div className="absolute z-30 mt-1 bg-white border rounded-xl shadow-lg min-w-[200px]">
+                <div className="p-2 border-b flex items-center justify-between">
+                  <span className="text-xs font-medium text-gray-500">Filtrar por estado</span>
+                  {filters.status.length > 0 && (
+                    <button onClick={() => setFilters(f => ({ ...f, status: [] }))} className="text-xs text-claro-red hover:underline">Limpiar</button>
+                  )}
+                </div>
+                <div className="py-1 max-h-64 overflow-y-auto">
+                  {PIPELINE_STATUSES.map(s => {
+                    const checked = filters.status.includes(s.key);
+                    return (
+                      <label key={s.key} className="flex items-center gap-2.5 px-3 py-2 hover:bg-gray-50 cursor-pointer">
+                        <input type="checkbox" checked={checked}
+                          onChange={() => setFilters(f => ({
+                            ...f,
+                            status: checked ? f.status.filter(x => x !== s.key) : [...f.status, s.key]
+                          }))}
+                          className="rounded accent-claro-red" />
+                        <span className={`text-xs px-2 py-0.5 rounded font-medium ${s.color || 'bg-gray-100 text-gray-700'}`}>{s.label}</span>
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
           <select value={filters.operator_id} onChange={e => setFilters(f => ({ ...f, operator_id: e.target.value }))}
             className="text-sm border rounded-lg px-3 py-2">
             <option value="">Todos los operadores</option>

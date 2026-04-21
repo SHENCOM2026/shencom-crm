@@ -25,8 +25,14 @@ function buildLeadFilter(req) {
 
   // Query filters
   if (req.query.status) {
-    conditions.push('l.pipeline_status = ?');
-    params.push(req.query.status);
+    const statuses = req.query.status.split(',').filter(Boolean);
+    if (statuses.length === 1) {
+      conditions.push('l.pipeline_status = ?');
+      params.push(statuses[0]);
+    } else if (statuses.length > 1) {
+      conditions.push(`l.pipeline_status IN (${statuses.map(() => '?').join(',')})`);
+      params.push(...statuses);
+    }
   }
   if (req.query.vendor_id) {
     conditions.push('l.vendor_id = ?');
