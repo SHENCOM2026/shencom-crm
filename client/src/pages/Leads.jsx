@@ -5,6 +5,140 @@ import { api } from '../utils/api';
 import { PIPELINE_STATUSES, getStatusInfo, formatDate } from '../utils/constants';
 import toast from 'react-hot-toast';
 
+/* ───── Sales Documents Panel ───── */
+function SalesDocuments({ leadId }) {
+  const [docs, setDocs] = useState([]);
+  const [uploading, setUploading] = useState(false);
+
+  const loadDocs = async () => {
+    try {
+      const data = await api.get(`/leads/${leadId}/documents`);
+      setDocs(data);
+    } catch (e) { /* ignore */ }
+  };
+
+  useEffect(() => { if (leadId) loadDocs(); }, [leadId]);
+
+  const handleUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const formData = new FormData();
+    formData.append('file', file);
+    setUploading(true);
+    try {
+      await api.upload(`/leads/${leadId}/documents`, formData);
+      toast.success('Documento subido');
+      await loadDocs();
+    } catch (err) {
+      toast.error(err.message || 'Error al subir documento');
+    } finally {
+      setUploading(false);
+      e.target.value = '';
+    }
+  };
+
+  const handleDelete = async (docId) => {
+    try {
+      await api.delete(`/leads/${leadId}/documents/${docId}`);
+      setDocs(prev => prev.filter(d => d.id !== docId));
+      toast.success('Documento eliminado');
+    } catch (err) {
+      toast.error('Error al eliminar');
+    }
+  };
+
+  const handleViewDoc = (doc) => {
+    const token = localStorage.getItem('token');
+    fetch(`/api/leads/${leadId}/documents/${doc.id}`, {
+      headers: { Authorization: `Bearer ${token}` }
+    })
+      .then(r => r.blob())
+      .then(blob => {
+        const url = URL.createObjectURL(blob);
+        window.open(url, '_blank');
+      })
+      .catch(() => toast.error('Error al abrir documento'));
+  };
+
+  const handleDownloadFormato = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch(`/api/leads/${leadId}/formato`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (!res.ok) { toast.error('Error al generar formato'); return; }
+      const blob = await res.blob();
+      const cd = res.headers.get('content-disposition') || '';
+      const match = cd.match(/filename="?([^"]+)"?/);
+      const filename = match ? match[1] : `FORMATO_INGRESO_${leadId}.xlsx`;
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = filename;
+      a.click();
+      URL.revokeObjectURL(a.href);
+    } catch (e) {
+      toast.error('Error al descargar formato');
+    }
+  };
+
+  return (
+    <div className="border-t pt-4 space-y-3">
+      <div className="flex items-center justify-between flex-wrap gap-2">
+        <h4 className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+          <svg className="w-4 h-4 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+          </svg>
+          Documentos de Venta
+        </h4>
+        <button
+          type="button"
+          onClick={handleDownloadFormato}
+          className="flex items-center gap-1.5 px-3 py-1.5 bg-green-600 text-white rounded-lg text-xs font-medium hover:bg-green-700 transition-colors"
+        >
+          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+          </svg>
+          Formato de Ingreso (.xlsx)
+        </button>
+      </div>
+
+      {/* Upload PDF */}
+      <label className={`flex items-center gap-2 w-full px-3 py-2.5 border-2 border-dashed rounded-lg text-sm cursor-pointer transition-colors ${uploading ? 'opacity-50 cursor-not-allowed' : 'hover:border-claro-red hover:text-claro-red border-gray-300 text-gray-500'}`}>
+        <svg className="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+        </svg>
+        {uploading ? 'Subiendo documento...' : 'Subir PDF de requisitos (clic o arrastrar)'}
+        <input type="file" accept=".pdf,application/pdf" className="hidden" onChange={handleUpload} disabled={uploading} />
+      </label>
+
+      {/* Document list */}
+      {docs.length > 0 ? (
+        <div className="space-y-1.5">
+          {docs.map(doc => (
+            <div key={doc.id} className="flex items-center justify-between p-2.5 bg-red-50 border border-red-100 rounded-lg">
+              <div className="flex items-center gap-2 min-w-0">
+                <svg className="w-4 h-4 text-red-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                </svg>
+                <div className="min-w-0">
+                  <p className="text-xs font-medium text-gray-800 truncate">{doc.original_name}</p>
+                  <p className="text-xs text-gray-400">{Math.round(doc.file_size / 1024)} KB — {doc.uploader_name}</p>
+                </div>
+              </div>
+              <div className="flex gap-2 flex-shrink-0 ml-2">
+                <button type="button" onClick={() => handleViewDoc(doc)} className="text-xs text-blue-600 hover:text-blue-800 font-medium">Ver</button>
+                <button type="button" onClick={() => handleDelete(doc.id)} className="text-xs text-red-500 hover:text-red-700">✕</button>
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <p className="text-xs text-gray-400 text-center py-1">Sin documentos adjuntos</p>
+      )}
+    </div>
+  );
+}
+
 /* ───── Lead Form Modal ───── */
 function LeadModal({ isOpen, onClose, onSave, lead, vendors, supervisors, plans, operators, sources }) {
   const [form, setForm] = useState({});
@@ -227,6 +361,10 @@ function LeadModal({ isOpen, onClose, onSave, lead, vendors, supervisors, plans,
             <textarea value={form.notes || ''} onChange={e => set('notes', e.target.value)} rows={3}
               className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-claro-red outline-none" />
           </div>
+
+          {/* Documents section — only when editing existing lead */}
+          {lead?.id && <SalesDocuments leadId={lead.id} />}
+
           <div className="flex gap-3 justify-end pt-2">
             <button type="button" onClick={onClose} className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg">Cancelar</button>
             <button type="submit" className="px-4 py-2 bg-claro-red text-white rounded-lg hover:bg-claro-red-dark">Guardar</button>

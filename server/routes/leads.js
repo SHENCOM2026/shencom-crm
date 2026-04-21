@@ -4,6 +4,30 @@ const { authMiddleware } = require('../middleware/auth');
 const multer = require('multer');
 const { parse } = require('csv-parse/sync');
 const { stringify } = require('csv-stringify/sync');
+const ExcelJS = require('exceljs');
+const path = require('path');
+const fs = require('fs');
+
+// Multer setup for PDF uploads
+const pdfStorage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    const dir = path.join(__dirname, '../../uploads/lead_docs');
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    cb(null, dir);
+  },
+  filename: (req, file, cb) => {
+    const safe = file.originalname.replace(/[^a-zA-Z0-9.\-_]/g, '_');
+    cb(null, `${Date.now()}-${safe}`);
+  }
+});
+const uploadPdf = multer({
+  storage: pdfStorage,
+  limits: { fileSize: 20 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    if (file.mimetype === 'application/pdf') cb(null, true);
+    else cb(new Error('Solo se permiten archivos PDF'));
+  }
+});
 
 const router = express.Router();
 router.use(authMiddleware);
@@ -490,6 +514,126 @@ router.get('/export/csv', (req, res) => {
   res.setHeader('Content-Type', 'text/csv');
   res.setHeader('Content-Disposition', 'attachment; filename=leads_shencom.csv');
   res.send(csv);
+});
+
+// ─── Lead Documents ───────────────────────────────────────
+
+// GET /leads/:id/documents
+router.get('/:id/documents', (req, res) => {
+  const docs = db.prepare(`
+    SELECT ld.*, u.full_name as uploader_name
+    FROM lead_documents ld
+    LEFT JOIN users u ON ld.uploaded_by = u.id
+    WHERE ld.lead_id = ?
+    ORDER BY ld.created_at DESC
+  `).all(req.params.id);
+  res.json(docs);
+});
+
+// POST /leads/:id/documents — upload PDF
+router.post('/:id/documents', uploadPdf.single('file'), (req, res) => {
+  const leadId = parseInt(req.params.id);
+  const lead = db.prepare('SELECT id FROM leads WHERE id = ?').get(leadId);
+  if (!lead) return res.status(404).json({ error: 'Lead no encontrado' });
+  if (!req.file) return res.status(400).json({ error: 'No se recibió archivo PDF' });
+
+  const result = db.prepare(`
+    INSERT INTO lead_documents (lead_id, file_name, original_name, file_size, uploaded_by)
+    VALUES (?, ?, ?, ?, ?)
+  `).run(leadId, req.file.filename, req.file.originalname, req.file.size, req.user.id);
+
+  res.status(201).json({ id: result.lastInsertRowid, message: 'Documento subido correctamente' });
+});
+
+// GET /leads/:id/documents/:docId — download PDF
+router.get('/:id/documents/:docId', (req, res) => {
+  const doc = db.prepare('SELECT * FROM lead_documents WHERE id = ? AND lead_id = ?')
+    .get(req.params.docId, req.params.id);
+  if (!doc) return res.status(404).json({ error: 'Documento no encontrado' });
+
+  const filePath = path.join(__dirname, '../../uploads/lead_docs', doc.file_name);
+  if (!fs.existsSync(filePath)) return res.status(404).json({ error: 'Archivo no encontrado en servidor' });
+
+  res.setHeader('Content-Type', 'application/pdf');
+  res.setHeader('Content-Disposition', `inline; filename="${doc.original_name}"`);
+  res.sendFile(path.resolve(filePath));
+});
+
+// DELETE /leads/:id/documents/:docId
+router.delete('/:id/documents/:docId', (req, res) => {
+  const doc = db.prepare('SELECT * FROM lead_documents WHERE id = ? AND lead_id = ?')
+    .get(req.params.docId, req.params.id);
+  if (!doc) return res.status(404).json({ error: 'Documento no encontrado' });
+
+  const filePath = path.join(__dirname, '../../uploads/lead_docs', doc.file_name);
+  if (fs.existsSync(filePath)) {
+    try { fs.unlinkSync(filePath); } catch (e) { /* ignore */ }
+  }
+  db.prepare('DELETE FROM lead_documents WHERE id = ?').run(doc.id);
+  res.json({ message: 'Documento eliminado' });
+});
+
+// GET /leads/:id/formato — Download Excel format pre-filled with lead data
+router.get('/:id/formato', async (req, res) => {
+  const lead = db.prepare(`
+    SELECT l.*, u.full_name as vendor_name
+    FROM leads l
+    LEFT JOIN users u ON l.vendor_id = u.id
+    WHERE l.id = ?
+  `).get(req.params.id);
+  if (!lead) return res.status(404).json({ error: 'Lead no encontrado' });
+
+  const templatePath = path.join(__dirname, '../assets/formato_ingreso_template.xlsx');
+  if (!fs.existsSync(templatePath)) {
+    return res.status(500).json({ error: 'Plantilla no encontrada en servidor' });
+  }
+
+  try {
+    const workbook = new ExcelJS.Workbook();
+    await workbook.xlsx.readFile(templatePath);
+
+    const fillSheet = (sheetName, cells) => {
+      const ws = workbook.getWorksheet(sheetName);
+      if (!ws) return;
+      cells.forEach(([addr, value]) => {
+        if (value) ws.getCell(addr).value = String(value);
+      });
+    };
+
+    // Fill INGRESO sheet
+    fillSheet('INGRESO', [
+      ['B6', lead.full_name],
+      ['B7', lead.cedula],
+      ['B13', lead.city],
+      ['B17', lead.phone_primary],
+      ['B18', lead.email],
+      // Gestores section
+      ['A39', lead.full_name],
+      ['C39', lead.cedula],
+      ['D39', lead.phone_primary],
+      ['E39', lead.email],
+      // Line/portabilidad section
+      ['A44', lead.full_name],
+      ['B44', lead.phone_primary],
+    ]);
+
+    // Fill SP NATURAL sheet
+    fillSheet('SP NATURAL', [
+      ['E9', lead.full_name],
+      ['E10', lead.cedula],
+    ]);
+
+    const safeName = (lead.full_name || 'lead').replace(/[^a-zA-Z0-9\s]/g, '').trim().replace(/\s+/g, '_');
+    const filename = `FORMATO_INGRESO_${safeName}.xlsx`;
+
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    await workbook.xlsx.write(res);
+    res.end();
+  } catch (e) {
+    console.error('Error generating formato:', e);
+    res.status(500).json({ error: 'Error al generar formato: ' + e.message });
+  }
 });
 
 module.exports = router;

@@ -183,6 +183,18 @@ db.exec(`
   );
 
   CREATE INDEX IF NOT EXISTS idx_import_history_user ON import_history(user_id);
+
+  CREATE TABLE IF NOT EXISTS lead_documents (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    lead_id INTEGER NOT NULL REFERENCES leads(id) ON DELETE CASCADE,
+    file_name TEXT NOT NULL,
+    original_name TEXT NOT NULL,
+    file_size INTEGER NOT NULL,
+    uploaded_by INTEGER REFERENCES users(id),
+    created_at TEXT DEFAULT (datetime('now'))
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_lead_documents_lead ON lead_documents(lead_id);
 `);
 
 // Migration: add new columns if they don't exist

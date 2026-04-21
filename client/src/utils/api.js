@@ -27,7 +27,7 @@ async function request(endpoint, options = {}) {
 
   // Handle file downloads
   const contentType = res.headers.get('content-type');
-  if (contentType && (contentType.includes('spreadsheet') || contentType.includes('csv') || contentType.includes('octet-stream'))) {
+  if (contentType && (contentType.includes('spreadsheet') || contentType.includes('csv') || contentType.includes('octet-stream') || contentType.includes('pdf'))) {
     if (!res.ok) throw new Error('Error en descarga');
     return res;
   }
