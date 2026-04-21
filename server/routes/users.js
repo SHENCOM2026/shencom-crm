@@ -74,34 +74,59 @@ router.post('/', requireRole('gerente'), (req, res) => {
 // Update user
 router.put('/:id', requireRole('gerente'), (req, res) => {
   const { full_name, email, phone, role, supervisor_id, monthly_portability_goal, daily_call_goal, active, password } = req.body;
-  const userId = req.params.id;
+  const userId = parseInt(req.params.id);
 
-  // Prevent gerente from changing their own password through this endpoint
-  if (password && parseInt(userId) === req.user.id) {
-    return res.status(400).json({ error: 'No puede cambiar su propia contraseña desde este panel. Use su perfil.' });
+  if (!full_name || !role) {
+    return res.status(400).json({ error: 'Nombre y rol son requeridos.' });
   }
 
-  let query = `UPDATE users SET full_name = ?, email = ?, phone = ?, role = ?, supervisor_id = ?,
-    monthly_portability_goal = ?, daily_call_goal = ?, active = ?,
-    modified_by = ?, modified_at = datetime('now'), updated_at = datetime('now')`;
-  let params = [full_name, email || null, phone || null, role, supervisor_id || null,
-    monthly_portability_goal || 30, daily_call_goal || 40, active !== undefined ? active : 1,
-    req.user.id];
-
-  if (password) {
-    query += ', password = ?';
-    params.push(bcrypt.hashSync(password, 10));
+  if (password && userId === req.user.id) {
+    return res.status(400).json({ error: 'No puede cambiar su propia contraseña desde este panel.' });
   }
 
-  query += ' WHERE id = ?';
-  params.push(userId);
+  const user = db.prepare('SELECT id FROM users WHERE id = ?').get(userId);
+  if (!user) return res.status(404).json({ error: 'Usuario no encontrado.' });
 
-  db.prepare(query).run(...params);
+  try {
+    let updates = [
+      'full_name = ?', 'email = ?', 'phone = ?', 'role = ?', 'supervisor_id = ?',
+      'monthly_portability_goal = ?', 'daily_call_goal = ?', 'active = ?',
+      "updated_at = datetime('now')"
+    ];
+    let params = [
+      full_name,
+      email || null,
+      phone || null,
+      role,
+      supervisor_id || null,
+      parseInt(monthly_portability_goal) || 30,
+      parseInt(daily_call_goal) || 40,
+      active ? 1 : 0,
+    ];
 
-  db.prepare('INSERT INTO user_activity_log (user_id, action, details) VALUES (?, ?, ?)')
-    .run(req.user.id, 'update_user', `Updated user ID: ${userId}, fields: ${Object.keys(req.body).filter(k => k !== 'password').join(', ')}`);
+    // Add modified_by/modified_at only if columns exist
+    try {
+      db.prepare('SELECT modified_by FROM users LIMIT 1').get();
+      updates.push("modified_by = ?", "modified_at = datetime('now')");
+      params.push(req.user.id);
+    } catch (e) { /* columns don't exist yet, skip */ }
 
-  res.json({ message: 'Usuario actualizado' });
+    if (password) {
+      updates.push('password = ?');
+      params.push(bcrypt.hashSync(password, 10));
+    }
+
+    params.push(userId);
+    db.prepare(`UPDATE users SET ${updates.join(', ')} WHERE id = ?`).run(...params);
+
+    db.prepare('INSERT INTO user_activity_log (user_id, action, details) VALUES (?, ?, ?)')
+      .run(req.user.id, 'update_user', `Updated user ID: ${userId} (${full_name})`);
+
+    res.json({ message: 'Usuario actualizado correctamente.' });
+  } catch (e) {
+    console.error('Error updating user:', e);
+    res.status(500).json({ error: 'Error al actualizar el usuario: ' + e.message });
+  }
 });
 
 // Delete user
