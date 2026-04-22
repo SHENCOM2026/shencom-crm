@@ -195,6 +195,14 @@ db.exec(`
   );
 
   CREATE INDEX IF NOT EXISTS idx_lead_documents_lead ON lead_documents(lead_id);
+
+  CREATE TABLE IF NOT EXISTS lead_sale_forms (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    lead_id INTEGER NOT NULL UNIQUE REFERENCES leads(id) ON DELETE CASCADE,
+    form_data TEXT NOT NULL DEFAULT '{}',
+    updated_by INTEGER REFERENCES users(id),
+    updated_at TEXT DEFAULT (datetime('now'))
+  );
 `);
 
 // Migration: add new columns if they don't exist
@@ -205,6 +213,8 @@ try { db.exec("ALTER TABLE leads ADD COLUMN import_id INTEGER REFERENCES import_
 try { db.exec("ALTER TABLE users ADD COLUMN phone TEXT"); } catch(e) {}
 try { db.exec("ALTER TABLE users ADD COLUMN modified_by INTEGER"); } catch(e) {}
 try { db.exec("ALTER TABLE users ADD COLUMN modified_at TEXT"); } catch(e) {}
+try { db.exec("ALTER TABLE lead_documents ADD COLUMN drive_file_id TEXT"); } catch(e) {}
+try { db.exec("ALTER TABLE lead_documents ADD COLUMN drive_link TEXT"); } catch(e) {}
 
 // Seed default WhatsApp config if not exists
 const insertDefault = db.prepare('INSERT OR IGNORE INTO app_config (config_key, config_value) VALUES (?, ?)');

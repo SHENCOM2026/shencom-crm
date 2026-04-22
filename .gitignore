@@ -7,3 +7,5 @@ shencom.db-shm
 .DS_Store
 *.log
 .env
+server/credentials/
+uploads/

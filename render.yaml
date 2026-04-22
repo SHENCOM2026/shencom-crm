@@ -11,6 +11,12 @@ services:
         generateValue: true
       - key: DB_PATH
         value: /data/shencom.db
+      - key: CRM_BASE_URL
+        value: https://shencom-crm.onrender.com
+      - key: GOOGLE_SHEET_ID
+        value: 184HUCx8B9kpDwHKA-YUZUetfSIoYYzULGqjHpt04htM
+      - key: GOOGLE_CREDENTIALS_JSON
+        sync: false
     disk:
       name: shencom-data
       mountPath: /data

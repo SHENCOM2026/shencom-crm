@@ -7,6 +7,7 @@ const { stringify } = require('csv-stringify/sync');
 const ExcelJS = require('exceljs');
 const path = require('path');
 const fs = require('fs');
+const { upsertSaleForm } = require('../lib/googleSheets');
 
 // Multer setup for PDF uploads
 const pdfStorage = multer.diskStorage({
@@ -516,6 +517,61 @@ router.get('/export/csv', (req, res) => {
   res.send(csv);
 });
 
+// ─── Sale Form ────────────────────────────────────────────
+
+// GET /leads/:id/sale-form
+router.get('/:id/sale-form', (req, res) => {
+  const leadId = parseInt(req.params.id);
+  const lead = db.prepare('SELECT * FROM leads WHERE id = ?').get(leadId);
+  if (!lead) return res.status(404).json({ error: 'Lead no encontrado' });
+
+  const form = db.prepare('SELECT * FROM lead_sale_forms WHERE lead_id = ?').get(leadId);
+  const formData = form ? JSON.parse(form.form_data) : {};
+
+  // Pre-fill with lead data if not already set
+  const defaults = {
+    titular: lead.full_name || '',
+    ruc_ci: lead.cedula || '',
+    celular: lead.phone_primary || '',
+    correo: lead.email || '',
+    ciudad: lead.city || '',
+    gestor_nombre: lead.full_name || '',
+    gestor_ci: lead.cedula || '',
+    gestor_celular: lead.phone_primary || '',
+    gestor_correo: lead.email || '',
+    lineas: [{ usuario: lead.full_name || '', numero_portar: lead.phone_primary || '', tipo_transaccion: 'PORTABILIDAD', tarifa: '', bp: '', equipo: '', financiamiento: '', feature: '', codigo_feature: '' }],
+  };
+
+  res.json({ ...defaults, ...formData });
+});
+
+// PUT /leads/:id/sale-form
+router.put('/:id/sale-form', async (req, res) => {
+  const leadId = parseInt(req.params.id);
+  const lead = db.prepare('SELECT id, vendor_id FROM leads WHERE id = ?').get(leadId);
+  if (!lead) return res.status(404).json({ error: 'Lead no encontrado' });
+
+  const formData = JSON.stringify(req.body);
+  db.prepare(`
+    INSERT INTO lead_sale_forms (lead_id, form_data, updated_by, updated_at)
+    VALUES (?, ?, ?, datetime('now'))
+    ON CONFLICT(lead_id) DO UPDATE SET
+      form_data = excluded.form_data,
+      updated_by = excluded.updated_by,
+      updated_at = excluded.updated_at
+  `).run(leadId, formData, req.user.id);
+
+  // Sync to Google Sheets (non-blocking error)
+  const vendor = db.prepare('SELECT full_name FROM users WHERE id = ?').get(lead.vendor_id);
+  const crmBase = process.env.CRM_BASE_URL || 'http://localhost:5173';
+  const syncResult = await upsertSaleForm(leadId, vendor?.full_name || '', {
+    ...req.body,
+    _crm_lead_link: `${crmBase}/leads?leadId=${leadId}`
+  });
+
+  res.json({ message: 'Formulario guardado', drive_sync: syncResult });
+});
+
 // ─── Lead Documents ───────────────────────────────────────
 
 // GET /leads/:id/documents
@@ -530,7 +586,7 @@ router.get('/:id/documents', (req, res) => {
   res.json(docs);
 });
 
-// POST /leads/:id/documents — upload PDF
+// POST /leads/:id/documents — upload PDF (stored locally on CRM server)
 router.post('/:id/documents', uploadPdf.single('file'), (req, res) => {
   const leadId = parseInt(req.params.id);
   const lead = db.prepare('SELECT id FROM leads WHERE id = ?').get(leadId);
@@ -573,7 +629,7 @@ router.delete('/:id/documents/:docId', (req, res) => {
   res.json({ message: 'Documento eliminado' });
 });
 
-// GET /leads/:id/formato — Download Excel format pre-filled with lead data
+// GET /leads/:id/formato — kept for backwards compat, redirects to sale-form concept
 router.get('/:id/formato', async (req, res) => {
   const lead = db.prepare(`
     SELECT l.*, u.full_name as vendor_name
