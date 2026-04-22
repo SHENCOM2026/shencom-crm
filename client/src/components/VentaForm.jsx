@@ -99,10 +99,42 @@ function DocUpload({ leadId }) {
 
 const EMPTY_LINEA = { usuario: '', numero_portar: '', tipo_transaccion: 'PORTABILIDAD', tarifa: '', bp: '', equipo: '', financiamiento: '', feature: '', codigo_feature: '' };
 
+// Parse bulk-paste text into lineas array.
+// Accepts TSV (from Excel), semicolon-separated, or pipe-separated values.
+// Expected column order: usuario, numero_portar, tipo_transaccion, tarifa, bp, equipo, financiamiento, feature, codigo_feature
+function parseBulkLineas(text) {
+  if (!text || !text.trim()) return [];
+  const rows = text.split(/\r?\n/).map(r => r.trim()).filter(Boolean);
+  return rows.map(row => {
+    // Prefer tabs (Excel paste); fallback to ; or | for manual typing
+    let parts;
+    if (row.includes('\t')) parts = row.split('\t');
+    else if (row.includes(';')) parts = row.split(';');
+    else if (row.includes('|')) parts = row.split('|');
+    else parts = [row]; // only usuario
+    parts = parts.map(p => (p || '').trim());
+    const tipoRaw = (parts[2] || '').toUpperCase();
+    const tipo = tipoRaw.includes('NUEVA') || tipoRaw.startsWith('N') ? 'LINEA NUEVA' : 'PORTABILIDAD';
+    return {
+      usuario: parts[0] || '',
+      numero_portar: parts[1] || '',
+      tipo_transaccion: tipo,
+      tarifa: parts[3] || '',
+      bp: parts[4] || '',
+      equipo: parts[5] || '',
+      financiamiento: parts[6] || '',
+      feature: parts[7] || '',
+      codigo_feature: parts[8] || '',
+    };
+  });
+}
+
 export default function VentaForm({ isOpen, onClose, lead }) {
   const [form, setForm] = useState({});
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [bulkOpen, setBulkOpen] = useState(false);
+  const [bulkText, setBulkText] = useState('');
 
   useEffect(() => {
     if (isOpen && lead?.id) {
@@ -124,6 +156,21 @@ export default function VentaForm({ isOpen, onClose, lead }) {
   });
   const addLinea = () => setForm(f => ({ ...f, lineas: [...(f.lineas || []), { ...EMPTY_LINEA, usuario: f.titular || '' }] }));
   const removeLinea = (i) => setForm(f => ({ ...f, lineas: (f.lineas || []).filter((_, idx) => idx !== i) }));
+
+  const applyBulk = (mode) => {
+    const parsed = parseBulkLineas(bulkText);
+    if (parsed.length === 0) {
+      toast.error('No se detectaron líneas. Pegá datos desde Excel o WhatsApp.');
+      return;
+    }
+    setForm(f => ({
+      ...f,
+      lineas: mode === 'replace' ? parsed : [...(f.lineas || []), ...parsed]
+    }));
+    setBulkText('');
+    setBulkOpen(false);
+    toast.success(`${parsed.length} línea${parsed.length > 1 ? 's' : ''} ${mode === 'replace' ? 'cargadas' : 'agregadas'}`);
+  };
 
   const handleSave = async () => {
     setSaving(true);
@@ -354,6 +401,58 @@ export default function VentaForm({ isOpen, onClose, lead }) {
             {/* 6. LÍNEAS */}
             <SECTION title="6. Líneas a Portar / Nuevas">
               <div className="space-y-3">
+                {/* Bulk paste */}
+                <div className="print:hidden">
+                  <button
+                    type="button"
+                    onClick={() => setBulkOpen(v => !v)}
+                    className="w-full flex items-center justify-center gap-2 py-2 border border-blue-300 bg-blue-50 text-blue-700 rounded-lg text-sm font-medium hover:bg-blue-100"
+                  >
+                    📋 {bulkOpen ? 'Cerrar pegado en bloque' : 'Pegar varias líneas desde Excel'}
+                  </button>
+                  {bulkOpen && (
+                    <div className="mt-2 bg-blue-50 border border-blue-200 rounded-lg p-3 space-y-2">
+                      <p className="text-xs text-blue-900 leading-relaxed">
+                        Copia las filas desde Excel/Sheets y pégalas aquí. <strong>Orden de columnas:</strong>
+                        <br />
+                        <span className="font-mono text-[11px]">Usuario · Número · Tipo · Tarifa · BP · Equipo · Financiamiento · Feature · Código Feature</span>
+                        <br />
+                        <span className="text-blue-700">Tipo admite "PORTABILIDAD" o "LINEA NUEVA". Columnas faltantes quedan vacías.</span>
+                      </p>
+                      <textarea
+                        value={bulkText}
+                        onChange={e => setBulkText(e.target.value)}
+                        rows={6}
+                        placeholder={'Juan Pérez\t0999111222\tPORTABILIDAD\t$25\tBP01\tiPhone 13\tFinanciado\t...\t...\nMaría López\t0988333444\tLINEA NUEVA\t$35\t...'}
+                        className="w-full px-3 py-2 border border-blue-300 rounded-lg text-xs font-mono focus:ring-2 focus:ring-claro-red outline-none bg-white"
+                      />
+                      <div className="flex flex-wrap gap-2">
+                        <button
+                          type="button"
+                          onClick={() => applyBulk('replace')}
+                          className="px-3 py-1.5 bg-claro-red text-white rounded-lg text-xs font-semibold hover:bg-claro-red-dark"
+                        >
+                          Reemplazar líneas existentes
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => applyBulk('append')}
+                          className="px-3 py-1.5 bg-white border border-blue-300 text-blue-700 rounded-lg text-xs font-semibold hover:bg-blue-50"
+                        >
+                          Agregar al final
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => { setBulkText(''); setBulkOpen(false); }}
+                          className="px-3 py-1.5 text-gray-500 text-xs hover:text-gray-700"
+                        >
+                          Cancelar
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
                 {lineas.map((l, i) => (
                   <div key={i} className="border border-gray-200 rounded-lg p-3 bg-white space-y-3">
                     <div className="flex items-center justify-between">
