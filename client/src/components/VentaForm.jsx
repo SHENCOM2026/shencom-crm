@@ -85,6 +85,9 @@ function DocUpload({ leadId }) {
               </div>
               <div className="flex gap-3 flex-shrink-0 ml-2">
                 <button type="button" onClick={() => handleView(doc)} className="text-xs text-blue-600 hover:underline">Ver</button>
+                {doc.drive_link && (
+                  <a href={doc.drive_link} target="_blank" rel="noopener noreferrer" className="text-xs text-green-700 hover:underline" title="Ver en Google Drive">Drive</a>
+                )}
                 <button type="button" onClick={() => handleDelete(doc.id)} className="text-xs text-red-500 hover:text-red-700">✕</button>
               </div>
             </div>

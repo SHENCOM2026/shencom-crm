@@ -1,40 +1,26 @@
-const path = require('path');
 const fs = require('fs');
 const { google } = require('googleapis');
 
-const CREDENTIALS_PATH = path.join(__dirname, '..', 'credentials', 'google.json');
+const CLIENT_ID = process.env.GOOGLE_OAUTH_CLIENT_ID;
+const CLIENT_SECRET = process.env.GOOGLE_OAUTH_CLIENT_SECRET;
+const REFRESH_TOKEN = process.env.GOOGLE_OAUTH_REFRESH_TOKEN;
 const FOLDER_ID = process.env.GOOGLE_DRIVE_FOLDER_ID || '1Yr9C5c6IN1AF8ClzC8hBNkV1C2a3bOu1';
 
 let cachedClient = null;
 let warnedDisabled = false;
 
-function loadCredentials() {
-  if (process.env.GOOGLE_CREDENTIALS_JSON) {
-    try { return JSON.parse(process.env.GOOGLE_CREDENTIALS_JSON); }
-    catch (e) { return null; }
-  }
-  if (fs.existsSync(CREDENTIALS_PATH)) {
-    try { return JSON.parse(fs.readFileSync(CREDENTIALS_PATH, 'utf8')); }
-    catch (e) { return null; }
-  }
-  return null;
-}
-
 function getClient() {
   if (cachedClient) return cachedClient;
-  const creds = loadCredentials();
-  if (!creds) {
+  if (!CLIENT_ID || !CLIENT_SECRET || !REFRESH_TOKEN) {
     if (!warnedDisabled) {
-      console.warn('[googleDrive] credentials not found, sync disabled');
+      console.warn('[googleDrive] OAuth creds missing (need GOOGLE_OAUTH_CLIENT_ID, GOOGLE_OAUTH_CLIENT_SECRET, GOOGLE_OAUTH_REFRESH_TOKEN), sync disabled');
       warnedDisabled = true;
     }
     return null;
   }
-  const auth = new google.auth.GoogleAuth({
-    credentials: creds,
-    scopes: ['https://www.googleapis.com/auth/drive.file'],
-  });
-  cachedClient = google.drive({ version: 'v3', auth });
+  const oauth2 = new google.auth.OAuth2(CLIENT_ID, CLIENT_SECRET);
+  oauth2.setCredentials({ refresh_token: REFRESH_TOKEN });
+  cachedClient = google.drive({ version: 'v3', auth: oauth2 });
   return cachedClient;
 }
 

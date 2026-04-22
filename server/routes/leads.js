@@ -8,6 +8,7 @@ const ExcelJS = require('exceljs');
 const path = require('path');
 const fs = require('fs');
 const { upsertSaleForm } = require('../lib/googleSheets');
+const googleDrive = require('../lib/googleDrive');
 
 // Multer setup for PDF uploads
 const pdfStorage = multer.diskStorage({
@@ -586,19 +587,42 @@ router.get('/:id/documents', (req, res) => {
   res.json(docs);
 });
 
-// POST /leads/:id/documents — upload PDF (stored locally on CRM server)
-router.post('/:id/documents', uploadPdf.single('file'), (req, res) => {
+// POST /leads/:id/documents — upload PDF (stored locally + Google Drive)
+router.post('/:id/documents', uploadPdf.single('file'), async (req, res) => {
   const leadId = parseInt(req.params.id);
-  const lead = db.prepare('SELECT id FROM leads WHERE id = ?').get(leadId);
+  const lead = db.prepare('SELECT id, full_name, cedula FROM leads WHERE id = ?').get(leadId);
   if (!lead) return res.status(404).json({ error: 'Lead no encontrado' });
   if (!req.file) return res.status(400).json({ error: 'No se recibió archivo PDF' });
 
-  const result = db.prepare(`
-    INSERT INTO lead_documents (lead_id, file_name, original_name, file_size, uploaded_by)
-    VALUES (?, ?, ?, ?, ?)
-  `).run(leadId, req.file.filename, req.file.originalname, req.file.size, req.user.id);
+  // Upload to Google Drive (best-effort, does not block DB insert)
+  const safeName = (lead.full_name || `lead-${leadId}`).replace(/[^\w\s.-]/g, '').trim().replace(/\s+/g, '_');
+  const driveName = `${safeName}_${lead.cedula || leadId}_${req.file.originalname}`;
+  const filePath = req.file.path;
+  let driveResult = { uploaded: false };
+  try {
+    driveResult = await googleDrive.uploadPdf({ filePath, driveName });
+  } catch (e) {
+    console.error('[documents] drive upload threw:', e.message);
+  }
 
-  res.status(201).json({ id: result.lastInsertRowid, message: 'Documento subido correctamente' });
+  const result = db.prepare(`
+    INSERT INTO lead_documents (lead_id, file_name, original_name, file_size, uploaded_by, drive_file_id, drive_link)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+  `).run(
+    leadId,
+    req.file.filename,
+    req.file.originalname,
+    req.file.size,
+    req.user.id,
+    driveResult.uploaded ? driveResult.fileId : null,
+    driveResult.uploaded ? driveResult.webViewLink : null
+  );
+
+  res.status(201).json({
+    id: result.lastInsertRowid,
+    message: 'Documento subido correctamente',
+    drive: driveResult.uploaded ? { fileId: driveResult.fileId, webViewLink: driveResult.webViewLink } : null
+  });
 });
 
 // GET /leads/:id/documents/:docId — download PDF
@@ -616,7 +640,7 @@ router.get('/:id/documents/:docId', (req, res) => {
 });
 
 // DELETE /leads/:id/documents/:docId
-router.delete('/:id/documents/:docId', (req, res) => {
+router.delete('/:id/documents/:docId', async (req, res) => {
   const doc = db.prepare('SELECT * FROM lead_documents WHERE id = ? AND lead_id = ?')
     .get(req.params.docId, req.params.id);
   if (!doc) return res.status(404).json({ error: 'Documento no encontrado' });
@@ -624,6 +648,10 @@ router.delete('/:id/documents/:docId', (req, res) => {
   const filePath = path.join(__dirname, '../../uploads/lead_docs', doc.file_name);
   if (fs.existsSync(filePath)) {
     try { fs.unlinkSync(filePath); } catch (e) { /* ignore */ }
+  }
+  if (doc.drive_file_id) {
+    try { await googleDrive.deleteFile(doc.drive_file_id); }
+    catch (e) { console.error('[documents] drive delete threw:', e.message); }
   }
   db.prepare('DELETE FROM lead_documents WHERE id = ?').run(doc.id);
   res.json({ message: 'Documento eliminado' });

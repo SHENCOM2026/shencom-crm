@@ -17,6 +17,14 @@ services:
         value: 184HUCx8B9kpDwHKA-YUZUetfSIoYYzULGqjHpt04htM
       - key: GOOGLE_CREDENTIALS_JSON
         sync: false
+      - key: GOOGLE_DRIVE_FOLDER_ID
+        value: 1Yr9C5c6IN1AF8ClzC8hBNkV1C2a3bOu1
+      - key: GOOGLE_OAUTH_CLIENT_ID
+        sync: false
+      - key: GOOGLE_OAUTH_CLIENT_SECRET
+        sync: false
+      - key: GOOGLE_OAUTH_REFRESH_TOKEN
+        sync: false
     disk:
       name: shencom-data
       mountPath: /data

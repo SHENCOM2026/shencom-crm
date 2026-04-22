@@ -8,4 +8,5 @@ shencom.db-shm
 *.log
 .env
 server/credentials/
+server/scripts/getRefreshToken.js
 uploads/
