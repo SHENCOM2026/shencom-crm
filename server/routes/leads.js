@@ -595,12 +595,19 @@ router.post('/:id/documents', uploadPdf.single('file'), async (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'No se recibió archivo PDF' });
 
   // Upload to Google Drive (best-effort, does not block DB insert)
-  const safeName = (lead.full_name || `lead-${leadId}`).replace(/[^\w\s.-]/g, '').trim().replace(/\s+/g, '_');
-  const driveName = `${safeName}_${lead.cedula || leadId}_${req.file.originalname}`;
+  // Each client gets its own subfolder inside DOCUMENTOS SHENCOM
   const filePath = req.file.path;
   let driveResult = { uploaded: false };
   try {
-    driveResult = await googleDrive.uploadPdf({ filePath, driveName });
+    const clientFolderId = await googleDrive.getOrCreateClientFolder({
+      clientName: lead.full_name || `lead-${leadId}`,
+      cedula: lead.cedula,
+    });
+    driveResult = await googleDrive.uploadPdf({
+      filePath,
+      driveName: req.file.originalname,
+      parentFolderId: clientFolderId,
+    });
   } catch (e) {
     console.error('[documents] drive upload threw:', e.message);
   }

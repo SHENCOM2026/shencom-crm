@@ -24,14 +24,51 @@ function getClient() {
   return cachedClient;
 }
 
-async function uploadPdf({ filePath, driveName, mimeType = 'application/pdf' }) {
+const folderCache = new Map();
+
+async function getOrCreateClientFolder({ clientName, cedula }) {
+  const drive = getClient();
+  if (!drive) return null;
+  const safeName = (clientName || 'sin_nombre').replace(/[^\w\s.-]/g, '').trim().replace(/\s+/g, '_');
+  const folderName = cedula ? `${safeName}_${cedula}` : safeName;
+  if (folderCache.has(folderName)) return folderCache.get(folderName);
+  try {
+    // Escape single quotes for Drive query
+    const safeQueryName = folderName.replace(/'/g, "\\'");
+    const list = await drive.files.list({
+      q: `name='${safeQueryName}' and mimeType='application/vnd.google-apps.folder' and '${FOLDER_ID}' in parents and trashed=false`,
+      fields: 'files(id, name)',
+      pageSize: 1,
+    });
+    if (list.data.files && list.data.files.length > 0) {
+      const id = list.data.files[0].id;
+      folderCache.set(folderName, id);
+      return id;
+    }
+    const created = await drive.files.create({
+      requestBody: {
+        name: folderName,
+        mimeType: 'application/vnd.google-apps.folder',
+        parents: [FOLDER_ID],
+      },
+      fields: 'id',
+    });
+    folderCache.set(folderName, created.data.id);
+    return created.data.id;
+  } catch (e) {
+    console.error('[googleDrive] folder error:', e.message);
+    return null;
+  }
+}
+
+async function uploadPdf({ filePath, driveName, parentFolderId, mimeType = 'application/pdf' }) {
   const drive = getClient();
   if (!drive) return { uploaded: false, reason: 'no_credentials' };
   try {
     const res = await drive.files.create({
       requestBody: {
         name: driveName,
-        parents: [FOLDER_ID],
+        parents: [parentFolderId || FOLDER_ID],
       },
       media: {
         mimeType,
@@ -66,4 +103,4 @@ function getFolderLink() {
   return `https://drive.google.com/drive/folders/${FOLDER_ID}`;
 }
 
-module.exports = { uploadPdf, deleteFile, getFolderLink, FOLDER_ID };
+module.exports = { uploadPdf, deleteFile, getFolderLink, getOrCreateClientFolder, FOLDER_ID };
