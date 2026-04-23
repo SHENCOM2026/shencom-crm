@@ -1,10 +1,10 @@
 const fs = require('fs');
 const { google } = require('googleapis');
 
-const CLIENT_ID = process.env.GOOGLE_OAUTH_CLIENT_ID;
-const CLIENT_SECRET = process.env.GOOGLE_OAUTH_CLIENT_SECRET;
-const REFRESH_TOKEN = process.env.GOOGLE_OAUTH_REFRESH_TOKEN;
-const FOLDER_ID = process.env.GOOGLE_DRIVE_FOLDER_ID || '1Yr9C5c6IN1AF8ClzC8hBNkV1C2a3bOu1';
+const CLIENT_ID = (process.env.GOOGLE_OAUTH_CLIENT_ID || '').trim();
+const CLIENT_SECRET = (process.env.GOOGLE_OAUTH_CLIENT_SECRET || '').trim();
+const REFRESH_TOKEN = (process.env.GOOGLE_OAUTH_REFRESH_TOKEN || '').trim();
+const FOLDER_ID = (process.env.GOOGLE_DRIVE_FOLDER_ID || '1Yr9C5c6IN1AF8ClzC8hBNkV1C2a3bOu1').trim();
 
 let cachedClient = null;
 let warnedDisabled = false;
