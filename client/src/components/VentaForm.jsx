@@ -308,19 +308,27 @@ export default function VentaForm({ isOpen, onClose, lead }) {
 
             {/* 3. FORMA DE PAGO */}
             <SECTION title="3. Forma de Pago">
-              <div className="flex gap-4 mb-3">
-                {['BANCO', 'TARJETA'].map(opt => (
-                  <label key={opt} className="flex items-center gap-2 text-sm cursor-pointer">
-                    <input type="radio" name="forma_pago" value={opt}
-                      checked={(form.forma_pago || 'BANCO') === opt}
-                      onChange={() => set('forma_pago', opt)}
+              <div className="flex gap-4 mb-3 flex-wrap">
+                {[
+                  { value: 'BANCO', label: 'Débito bancario' },
+                  { value: 'TARJETA', label: 'Tarjeta de crédito' },
+                  { value: 'VENTANILLA', label: 'Pago Ventanilla' },
+                ].map(opt => (
+                  <label key={opt.value} className="flex items-center gap-2 text-sm cursor-pointer">
+                    <input type="radio" name="forma_pago" value={opt.value}
+                      checked={(form.forma_pago || 'BANCO') === opt.value}
+                      onChange={() => set('forma_pago', opt.value)}
                       className="accent-claro-red" />
-                    {opt === 'BANCO' ? 'Débito bancario' : 'Tarjeta de crédito'}
+                    {opt.label}
                   </label>
                 ))}
               </div>
 
-              {(form.forma_pago || 'BANCO') === 'BANCO' ? (
+              {(form.forma_pago || 'BANCO') === 'VENTANILLA' ? (
+                <div className="text-sm text-gray-600 italic px-1">
+                  El cliente realizará el pago directamente en ventanilla. No se requieren datos bancarios ni de tarjeta.
+                </div>
+              ) : (form.forma_pago || 'BANCO') === 'BANCO' ? (
                 <div className="grid grid-cols-2 gap-3">
                   <Field label="Banco (nombre de la institución)">
                     <input value={form.banco_nombre || ''} onChange={e => set('banco_nombre', e.target.value)} className={inp} />
@@ -477,7 +485,9 @@ export default function VentaForm({ isOpen, onClose, lead }) {
                         <label className="block text-xs font-medium text-gray-600 mb-1">Tipo de transacción</label>
                         <select value={l.tipo_transaccion || 'PORTABILIDAD'} onChange={e => setLinea(i, 'tipo_transaccion', e.target.value)} className={sel}>
                           <option value="PORTABILIDAD">PORTABILIDAD</option>
+                          <option value="PORTABILIDAD PREPAGO">PORTABILIDAD PREPAGO</option>
                           <option value="LINEA NUEVA">LÍNEA NUEVA</option>
+                          <option value="MIGRACION">MIGRACIÓN</option>
                         </select>
                       </div>
                       <div>

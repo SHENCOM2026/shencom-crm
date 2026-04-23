@@ -6,6 +6,26 @@ const CREDENTIALS_PATH = path.join(__dirname, '..', 'credentials', 'google.json'
 const SHEET_ID = process.env.GOOGLE_SHEET_ID || '184HUCx8B9kpDwHKA-YUZUetfSIoYYzULGqjHpt04htM';
 const SHEET_TAB = process.env.GOOGLE_SHEET_TAB || 'Ventas';
 
+const MAX_LINES = 4;
+const LINE_FIELDS = [
+  { key: 'usuario', label: 'Usuario' },
+  { key: 'numero_portar', label: 'Número' },
+  { key: 'tipo_transaccion', label: 'Tipo' },
+  { key: 'tarifa', label: 'Tarifa' },
+  { key: 'bp', label: 'BP' },
+  { key: 'equipo', label: 'Equipo' },
+  { key: 'financiamiento', label: 'Financiamiento' },
+  { key: 'feature', label: 'Feature' },
+  { key: 'codigo_feature', label: 'Cód. Feature' },
+];
+
+const LINE_HEADERS = [];
+for (let i = 1; i <= MAX_LINES; i++) {
+  for (const f of LINE_FIELDS) {
+    LINE_HEADERS.push(`L${i} ${f.label}`);
+  }
+}
+
 const HEADERS = [
   'Lead ID', 'Fecha actualización', 'Vendedor',
   'Titular', 'RUC/Cédula', 'Fecha nacimiento', 'Nacionalidad',
@@ -17,7 +37,8 @@ const HEADERS = [
   'Tarjeta tipo', 'Tarjeta número', 'Tarjeta titular', 'Tarjeta caducidad',
   'Lugar entrega', 'Dirección entrega', 'Referencia entrega',
   'Gestor nombre', 'Gestor cédula', 'Gestor celular', 'Gestor correo',
-  'Líneas (JSON)', 'Observaciones', 'Ver en CRM (documentos)'
+  ...LINE_HEADERS,
+  'Observaciones', 'Ver en CRM (documentos)'
 ];
 
 let cachedClient = null;
@@ -101,6 +122,14 @@ async function findRowByLeadId(sheets, leadId) {
 
 function buildRow(leadId, vendorName, formData) {
   const lineas = Array.isArray(formData.lineas) ? formData.lineas : [];
+  const lineCells = [];
+  for (let i = 0; i < MAX_LINES; i++) {
+    const l = lineas[i] || {};
+    for (const f of LINE_FIELDS) {
+      const v = l[f.key];
+      lineCells.push(v !== undefined && v !== null ? String(v).trim() : '');
+    }
+  }
   return [
     leadId,
     new Date().toISOString(),
@@ -134,7 +163,7 @@ function buildRow(leadId, vendorName, formData) {
     formData.gestor_ci || '',
     formData.gestor_celular || '',
     formData.gestor_correo || '',
-    JSON.stringify(lineas),
+    ...lineCells,
     formData.observaciones || '',
     formData._crm_lead_link || ''
   ];
