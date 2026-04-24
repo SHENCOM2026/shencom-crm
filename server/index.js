@@ -7,8 +7,28 @@ const seed = require('./seed');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Middleware
-app.use(cors());
+// CORS allowlist: production URL + local dev + LAN (for mobile PWA)
+const DEFAULT_ALLOWED = [
+  'https://shencom-crm.onrender.com',
+  process.env.CRM_BASE_URL,
+].filter(Boolean);
+const EXTRA_ALLOWED = (process.env.ALLOWED_ORIGINS || '')
+  .split(',').map(s => s.trim()).filter(Boolean);
+const ALLOWED_ORIGINS = [...new Set([...DEFAULT_ALLOWED, ...EXTRA_ALLOWED])];
+// Regex for localhost and private LAN IPs (dev + mobile on local network)
+const LOCAL_ORIGIN_REGEX = /^https?:\/\/(localhost|127\.0\.0\.1|10\.\d{1,3}\.\d{1,3}\.\d{1,3}|192\.168\.\d{1,3}\.\d{1,3}|172\.(1[6-9]|2\d|3[01])\.\d{1,3}\.\d{1,3})(:\d+)?$/;
+
+app.use(cors({
+  origin: (origin, cb) => {
+    // No origin: same-origin request, curl, server-to-server, mobile WebView
+    if (!origin) return cb(null, true);
+    if (ALLOWED_ORIGINS.includes(origin)) return cb(null, true);
+    if (LOCAL_ORIGIN_REGEX.test(origin)) return cb(null, true);
+    console.warn('[CORS] blocked origin:', origin);
+    return cb(new Error('Not allowed by CORS'));
+  },
+  credentials: true,
+}));
 app.use(express.json({ limit: '10mb' }));
 
 // Seed database on first run
