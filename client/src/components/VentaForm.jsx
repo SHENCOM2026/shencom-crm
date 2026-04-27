@@ -479,11 +479,15 @@ export default function VentaForm({ isOpen, onClose, lead }) {
                       </div>
                       <div>
                         <label className="block text-xs font-medium text-gray-600 mb-1">Número a portarse</label>
-                        <input value={l.numero_portar || ''} onChange={e => setLinea(i, 'numero_portar', e.target.value)} className={inp} />
+                        <input value={l.numero_portar || ''} onChange={e => setLinea(i, 'numero_portar', e.target.value)} className={inp} placeholder={l.tipo_transaccion === 'LINEA NUEVA' ? 'Número nuevo asignado' : ''} />
                       </div>
                       <div>
                         <label className="block text-xs font-medium text-gray-600 mb-1">Tipo de transacción</label>
-                        <select value={l.tipo_transaccion || 'PORTABILIDAD'} onChange={e => setLinea(i, 'tipo_transaccion', e.target.value)} className={sel}>
+                        <select value={l.tipo_transaccion || 'PORTABILIDAD'} onChange={e => {
+                          const nuevoTipo = e.target.value;
+                          setLinea(i, 'tipo_transaccion', nuevoTipo);
+                          if (nuevoTipo === 'LINEA NUEVA') setLinea(i, 'numero_portar', '');
+                        }} className={sel}>
                           <option value="PORTABILIDAD">PORTABILIDAD</option>
                           <option value="PORTABILIDAD PREPAGO">PORTABILIDAD PREPAGO</option>
                           <option value="LINEA NUEVA">LÍNEA NUEVA</option>
