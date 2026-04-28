@@ -492,6 +492,7 @@ export default function VentaForm({ isOpen, onClose, lead }) {
                           <option value="PORTABILIDAD PREPAGO">PORTABILIDAD PREPAGO</option>
                           <option value="LINEA NUEVA">LÍNEA NUEVA</option>
                           <option value="MIGRACION">MIGRACIÓN</option>
+                          <option value="INTERNET FIJO">INTERNET FIJO</option>
                         </select>
                       </div>
                       <div>

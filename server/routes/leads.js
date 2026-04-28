@@ -540,6 +540,8 @@ router.get('/:id/sale-form', (req, res) => {
     gestor_ci: lead.cedula || '',
     gestor_celular: lead.phone_primary || '',
     gestor_correo: lead.email || '',
+    forma_pago: 'BANCO',
+    tipo_cuenta: 'AHORROS',
     lineas: [{ usuario: lead.full_name || '', numero_portar: lead.phone_primary || '', tipo_transaccion: 'PORTABILIDAD', tarifa: '', bp: '', equipo: '', financiamiento: '', feature: '', codigo_feature: '' }],
   };
 
@@ -567,6 +569,8 @@ router.put('/:id/sale-form', async (req, res) => {
   const crmBase = process.env.CRM_BASE_URL || 'http://localhost:5173';
   const syncResult = await upsertSaleForm(leadId, vendor?.full_name || '', {
     ...req.body,
+    forma_pago: req.body.forma_pago || 'BANCO',
+    tipo_cuenta: req.body.tipo_cuenta || (req.body.forma_pago === 'BANCO' || !req.body.forma_pago ? 'AHORROS' : ''),
     _crm_lead_link: `${crmBase}/leads?leadId=${leadId}`
   });
 
