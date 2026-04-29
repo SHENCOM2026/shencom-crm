@@ -2,6 +2,18 @@ const bcrypt = require('bcryptjs');
 const db = require('./database');
 
 function seed() {
+  // One-time migrations (run regardless of seed state)
+  try {
+    const renamed = db.prepare(
+      "UPDATE lead_sources SET name = ? WHERE name = ?"
+    ).run('Campaña redes sociales', 'Queja redes sociales');
+    if (renamed.changes > 0) {
+      console.log(`[migration] renamed lead_source: Queja redes sociales -> Campaña redes sociales (${renamed.changes} row)`);
+    }
+  } catch (e) {
+    console.error('[migration] lead_source rename failed:', e.message);
+  }
+
   // Check if already seeded
   const adminExists = db.prepare('SELECT id FROM users WHERE username = ?').get('admin');
   if (adminExists) {
@@ -25,7 +37,7 @@ function seed() {
 
   // Seed lead sources
   const sources = [
-    'Queja redes sociales', 'Referido', 'Base de datos',
+    'Campaña redes sociales', 'Referido', 'Base de datos',
     'Llamada fría', 'WhatsApp entrante', 'Otro'
   ];
   const insertSource = db.prepare('INSERT INTO lead_sources (name) VALUES (?)');
